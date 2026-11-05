@@ -1,0 +1,22 @@
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+body { margin: 0; padding: 12px; height: 100vh; display: flex; flex-direction: column; gap: 10px; color: var(--vscode-foreground, #ddd); background: var(--vscode-sideBar-background, #181818); font: var(--vscode-font-size, 13px) var(--vscode-font-family, sans-serif); }
+header { display: flex; flex-direction: column; gap: 6px; }
+label { font-size: 11px; color: var(--vscode-descriptionForeground, #aaa); }
+.picker { display: flex; gap: 6px; }
+select { min-width: 0; flex: 1; border: 1px solid var(--vscode-dropdown-border, #555); color: var(--vscode-dropdown-foreground, #ddd); background: var(--vscode-dropdown-background, #252525); padding: 5px; border-radius: 3px; }
+button { cursor: pointer; color: var(--vscode-button-secondaryForeground, #ddd); background: var(--vscode-button-secondaryBackground, #333); border: 1px solid transparent; border-radius: 3px; padding: 6px 8px; font: inherit; }
+button:hover { background: var(--vscode-button-secondaryHoverBackground, #444); }
+button:disabled { opacity: .45; cursor: default; }
+button:focus-visible, select:focus-visible, canvas:focus-visible { outline: 1px solid var(--vscode-focusBorder, #499bff); outline-offset: 2px; }
+#status { color: var(--vscode-descriptionForeground, #aaa); font-size: 12px; overflow-wrap: anywhere; }
+#status[data-state="error"], #notice { color: var(--vscode-errorForeground, #ff9696); }
+#notice { font-size: 12px; overflow-wrap: anywhere; }
+#stage { flex: 1; min-height: 40px; min-width: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; }
+canvas { display: none; max-width: 100%; max-height: 100%; object-fit: contain; touch-action: none; user-select: none; background: #000; }
+canvas.live { display: block; }
+#empty { max-width: 230px; text-align: center; line-height: 1.6; color: var(--vscode-descriptionForeground, #aaa); }
+nav { display: flex; gap: 5px; }
+nav button { flex: 1; min-width: 0; padding: 7px 3px; font-size: 11px; }
+footer { font: 10px/1.6 var(--vscode-editor-font-family, monospace); color: var(--vscode-descriptionForeground, #aaa); min-height: 16px; }
+[hidden] { display: none !important; }

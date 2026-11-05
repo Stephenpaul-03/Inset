@@ -1,0 +1,9 @@
+**
+!package.json
+!README.md
+!CHANGELOG.md
+!THIRD_PARTY_NOTICES.md
+!LICENSE.md
+!dist/extension.js
+!media/**
+!proto/**
