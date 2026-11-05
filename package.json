@@ -1,6 +1,6 @@
 {
   "name": "portal-emulator",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "private": true,
   "description": "View and control a running Android emulator in a compact sidebar or editor tab.",
   "main": "./dist/extension.js",
@@ -13,7 +13,9 @@
     "test:extension": "tsc && node scripts/test-extension.cjs",
     "vscode:prepublish": "npm run build",
     "package": "node scripts/package.mjs",
-    "test:channel": "tsc && node --test out/test/channel.integration.js"
+    "test:channel": "tsc && node --test out/test/channel.integration.js",
+    "test:inspector": "tsc && node scripts/test-inspector.mjs",
+    "test:inspector:live": "tsc && node scripts/test-inspector.mjs --live"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
@@ -69,6 +71,14 @@
       {
         "command": "portal.openSidebar",
         "title": "Portal: Move Emulator to Sidebar"
+      },
+      {
+        "command": "portal.inspect",
+        "title": "Portal: Open React Native Inspector"
+      },
+      {
+        "command": "portal.pickComponent",
+        "title": "Portal: Pick React Native Component"
       }
     ],
     "viewsContainers": {
@@ -132,6 +142,11 @@
           ],
           "default": "smooth",
           "description": "Emulator streaming mode."
+        },
+        "portal.metroUrl": {
+          "type": "string",
+          "default": "http://127.0.0.1:8081",
+          "description": "Local Metro development-server URL used by the React Native inspector."
         }
       }
     }
@@ -139,6 +154,12 @@
   "overrides": {
     "@vscode/vsce": {
       "minimatch": "^11.0.1"
+    }
+  },
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": "limited",
+      "description": "The emulator is available; React Native runtime inspection requires workspace trust."
     }
   }
 }

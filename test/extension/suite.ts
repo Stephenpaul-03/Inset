@@ -5,6 +5,7 @@ import path from 'node:path';
 import { Adb } from '../../src/adb/adb';
 import { findEmulators } from '../../src/discovery/running';
 import { verifyReconnect } from './reconnect';
+import { verifyInspector } from './inspector';
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 async function diagnostics(): Promise<any> { return vscode.commands.executeCommand('portal.diagnostics'); }
 async function waitFor(predicate: (d: any) => boolean, timeout = 15000): Promise<any> {
@@ -17,6 +18,7 @@ export async function run(): Promise<void> {
   assert.ok(extension); await extension.activate();
   await vscode.commands.executeCommand('portal.open');
   const initial = await waitFor(d => d.status.state === 'connected' && d.performance?.width > 0);
+  if (process.env.PORTAL_INSPECTOR_SMOKE === '1') { await verifyInspector(); return; }
   const emulatorTabs = () => vscode.window.tabGroups.all.flatMap(group => group.tabs)
     .filter(tab => tab.input instanceof vscode.TabInputWebview && tab.input.viewType.includes('portal.editor'));
   await vscode.commands.executeCommand('portal.openEditor');

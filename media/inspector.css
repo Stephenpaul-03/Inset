@@ -1,0 +1,62 @@
+:root { color-scheme: light dark; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+body { margin: 0; height: 100vh; display: flex; flex-direction: column; color: var(--vscode-foreground, #ccc); background: var(--vscode-editor-background, #181b20); font: var(--vscode-font-size, 13px) var(--vscode-font-family, sans-serif); }
+button, input, select, textarea { font: inherit; color: inherit; border: 1px solid var(--vscode-input-border, #ffffff20); border-radius: 4px; }
+button { cursor: pointer; padding: 5px 9px; background: var(--vscode-button-secondaryBackground, #ffffff0b); white-space: nowrap; }
+button:hover { background: var(--vscode-toolbar-hoverBackground, #ffffff18); }
+button:disabled { opacity: .4; cursor: default; }
+button[aria-pressed="true"] { background: var(--vscode-button-background, #236a9e); color: var(--vscode-button-foreground, white); }
+input, select, textarea { background: var(--vscode-input-background, #ffffff08); padding: 5px 7px; min-width: 0; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, [tabindex]:focus-visible, summary:focus-visible { outline: 1px solid var(--vscode-focusBorder, #499bff); outline-offset: -1px; }
+header { display: flex; align-items: center; gap: 6px; padding: 9px 12px; border-bottom: 1px solid var(--vscode-panel-border, #ffffff12); flex-wrap: wrap; }
+.brand { font-weight: 600; margin-right: 6px; }
+#targets { flex: 1; max-width: 430px; }
+.status-line { display: flex; gap: 8px; align-items: center; padding: 8px 12px; color: var(--vscode-descriptionForeground, #aaa); font-size: 12px; }
+.dot { width: 6px; height: 6px; flex-shrink: 0; border-radius: 50%; background: var(--vscode-descriptionForeground, #888); }
+.dot.connected { background: var(--vscode-testing-iconPassed, #73c991); }
+#version { margin-left: auto; font-size: 10px; }
+#error { padding: 8px 12px; color: var(--vscode-errorForeground, #f99); background: var(--vscode-inputValidation-errorBackground, #5a1d1d55); overflow-wrap: anywhere; }
+main { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(220px, 38%) minmax(0, 1fr); }
+.tree-pane { border-right: 1px solid var(--vscode-panel-border, #ffffff12); min-height: 0; display: flex; flex-direction: column; }
+.tree-toolbar { display: flex; gap: 6px; padding: 8px 10px; }
+#search { width: 100%; }
+#tree { flex: 1; min-height: 0; overflow: auto; padding: 4px 0; font: 12px/25px var(--vscode-editor-font-family, monospace); }
+.tree-row { display: flex; align-items: center; height: 25px; white-space: nowrap; min-width: max-content; padding-right: 12px; cursor: pointer; }
+.tree-row:hover { background: var(--vscode-list-hoverBackground, #ffffff08); }
+.tree-row[aria-selected="true"] { background: var(--vscode-list-activeSelectionBackground, #264f78); color: var(--vscode-list-activeSelectionForeground, white); }
+.tree-row .twisty { width: 22px; padding: 0; border: 0; background: transparent; flex-shrink: 0; }
+.node-name { color: var(--vscode-symbolIcon-classForeground, #e6c07b); }
+.tree-row[aria-selected="true"] .node-name { color: inherit; }
+.node-key { margin-left: 8px; opacity: .5; }
+#empty-tree { padding: 24px; line-height: 1.7; color: var(--vscode-descriptionForeground, #aaa); }
+footer { padding: 5px 10px; display: flex; gap: 4px; align-items: center; justify-content: space-between; font-size: 11px; color: var(--vscode-descriptionForeground, #aaa); border-top: 1px solid var(--vscode-panel-border, #ffffff12); }
+footer button { font-size: 11px; border: 0; }
+.details-pane { overflow: auto; padding: 16px 20px; }
+.selection-header { display: flex; align-items: center; gap: 8px; }
+.selection-header > div { flex: 1; min-width: 0; }
+.eyebrow { font-size: 10px; letter-spacing: .8px; color: var(--vscode-descriptionForeground, #aaa); }
+h1 { margin: 6px 0 10px; font: 500 20px var(--vscode-editor-font-family, monospace); overflow-wrap: anywhere; }
+#ancestors { display: flex; flex-wrap: wrap; gap: 2px; margin-bottom: 14px; }
+#ancestors button { padding: 2px 5px; border: 0; font-size: 11px; color: var(--vscode-descriptionForeground, #aaa); }
+#selection-hint, .edit-note, .muted { color: var(--vscode-descriptionForeground, #aaa); line-height: 1.6; font-size: 12px; }
+.edit-note { border-left: 2px solid var(--vscode-focusBorder, #499bff); padding-left: 10px; margin: 0 0 18px; }
+details { border-top: 1px solid var(--vscode-panel-border, #ffffff12); padding: 10px 0; }
+summary { cursor: pointer; font-weight: 600; margin-bottom: 8px; }
+.property, .hook { font: 12px/1.7 var(--vscode-editor-font-family, monospace); overflow-wrap: anywhere; }
+.property-line { display: flex; gap: 7px; align-items: baseline; padding: 3px 0; }
+.property-label { color: var(--vscode-symbolIcon-propertyForeground, #9cdcfe); flex-shrink: 0; }
+.property-value { white-space: pre-wrap; color: var(--vscode-debugTokenExpression-string, #ce9178); }
+.property-line button { padding: 0 5px; border: 0; font-size: 10px; opacity: .7; }
+.property-line button.edit { margin-left: auto; }
+.children { margin-left: 14px; border-left: 1px solid var(--vscode-panel-border, #ffffff12); padding-left: 9px; }
+.value-editor { display: flex; flex-wrap: wrap; gap: 6px; padding: 5px 0 9px; }
+.value-editor textarea { width: 100%; min-height: 65px; font: 12px/1.5 var(--vscode-editor-font-family, monospace); }
+.value-editor .validation { color: var(--vscode-errorForeground, #f99); }
+.layout-grid { display: flex; flex-wrap: wrap; gap: 7px; margin-bottom: 12px; }
+.measurement { border: 1px solid var(--vscode-panel-border, #ffffff12); border-radius: 4px; padding: 8px 12px; min-width: 75px; }
+.measurement span { display: block; font-size: 10px; color: var(--vscode-descriptionForeground, #aaa); margin-bottom: 4px; }
+.measurement strong { font: 14px var(--vscode-editor-font-family, monospace); }
+#add-style { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0; }
+#add-style input { flex: 1; width: 100px; }
+@media (max-width: 600px) { main { grid-template-columns: 1fr; grid-template-rows: minmax(160px, 40%) minmax(0, 1fr); } .tree-pane { border-right: 0; border-bottom: 1px solid var(--vscode-panel-border, #ffffff12); } .details-pane { padding: 12px; } #version, .brand { display: none; } }

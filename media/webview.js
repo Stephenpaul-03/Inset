@@ -149,6 +149,8 @@
         surface.style.width = surface.style.height = '';
       }
       active = message.active !== false; mode = message.mode || mode;
+      const inspect = document.querySelector('[data-button="inspect"]');
+      if (inspect) { inspect.setAttribute('aria-pressed', String(!!message.inspectorPicking)); inspect.title = message.inspectorPicking ? 'Stop picking React Native components' : 'Inspect React Native component'; }
       document.body.dataset.mode = mode; document.body.classList.toggle('parked', !active);
       document.getElementById('empty-message').textContent = active ? 'Start an emulator in Android Studio to connect.' : `The emulator is open in the ${mode === 'sidebar' ? 'editor' : 'sidebar'}.`;
       document.getElementById('move-here').hidden = active;

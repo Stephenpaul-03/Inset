@@ -5,6 +5,7 @@ body[data-mode="editor"] { background: var(--vscode-editor-background, #181b20);
 button, select { font: inherit; color: inherit; }
 button { cursor: pointer; border: 1px solid transparent; border-radius: 4px; background: transparent; }
 button:hover { background: var(--vscode-toolbar-hoverBackground, #ffffff10); }
+button[aria-pressed="true"].icon-button { color: var(--vscode-button-foreground, white); background: var(--vscode-button-background, #236a9e); }
 button:disabled { opacity: .35; cursor: default; }
 button:focus-visible, select:focus-visible, canvas:focus-visible { outline: 1px solid var(--vscode-focusBorder, #499bff); outline-offset: -1px; }
 .toolbar { display: flex; align-items: center; gap: 3px; min-height: 30px; flex-shrink: 0; }

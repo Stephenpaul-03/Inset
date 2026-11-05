@@ -1,9 +1,15 @@
 import * as vscode from 'vscode';
 import { EmulatorView } from './panel/EmulatorView';
+import { InspectorPanel } from './inspector/InspectorPanel';
 export function activate(context: vscode.ExtensionContext): void {
-  const provider = new EmulatorView(context);
+  const inspector = new InspectorPanel(context);
+  const provider = new EmulatorView(context, () => inspector.open(true));
   const output = vscode.window.createOutputChannel('Portal');
-  context.subscriptions.push(provider, output,
+  context.subscriptions.push(provider, output, inspector,
+    inspector.onPickingChanged(value => provider.setInspectorPicking(value)),
+    vscode.commands.registerCommand('portal.inspect', () => inspector.open()),
+    vscode.commands.registerCommand('portal.pickComponent', () => inspector.open(true)),
+    vscode.commands.registerCommand('portal.inspectorDiagnostics', () => inspector.diagnostics()),
     vscode.window.registerWebviewViewProvider('portal.emulator', provider, { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.commands.registerCommand('portal.refresh', () => provider.refresh()),
     vscode.commands.registerCommand('portal.open', () => provider.openSidebar()),

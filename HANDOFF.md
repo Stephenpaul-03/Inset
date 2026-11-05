@@ -1,5 +1,18 @@
 # VS Code Android Emulator Panel: v1 handoff
 
+## React Native inspection — v0.2.0, 5 November 2026
+
+- Added a React Native inspector **inside VS Code**: reusable editor tab, emulator-toolbar Inspect, native picking/highlighting, searchable component tree/ancestors, props/hooks/state/context, nested hydration, native styles/layout, capability-aware JSON runtime edits, and workspace source navigation through React/Hermes + Metro source maps.
+- Runtime connection: `src/inspector/{CdpClient,discovery,InspectorSession,ComponentTree}.ts`; VS Code host/source boundary: `InspectorPanel.ts`, `source.ts`; production markup/assets: `src/inspector/html.ts`, `media/inspector.{js,css}`. No app files/dependencies were changed for inspection.
+- Commands: **Portal: Open React Native Inspector**, **Portal: Pick React Native Component**. `portal.metroUrl` defaults to `http://127.0.0.1:8081`. The inspector requires workspace trust, local Metro, and a Hermes development build with the Fusebox dispatcher/DevTools bridge v2. Tally (RN 0.81.5, React 19.1, Expo 54) is the verified target; older standalone sockets, release builds, JavaScriptCore and full profiling are outside this adapter. Other RN versions still need validation.
+- RN 0.81 reconnect detail: AppContainer captures the first native overlay agent at mount. Replacing/shutting down that agent breaks native picking after reconnect. Portal reuses an existing dispatcher domain/agent and requests a fresh tree through the bridge's default host-component filter update; on close it stops picking/highlighting and closes CDP, leaving the app's built-in backend intact. Reloads rebuild the tree and discard stale selection requests.
+- Passed: seven core/protocol/source-boundary tests, production inspector browser checks, existing emulator browser checks, real Tally tree/props/hooks, `App.tsx` source mapping, temporary Text edit/restoration, native picking and reload recovery. The unpacked VSIX passed inside isolated VS Code: real app connection (~892 nodes), one-tab reuse, native selection, close/reopen picking, close cleanup and unchanged emulator session ID.
+- Artifacts: `artifacts/portal-emulator-0.2.0.vsix`, `inspector-live.png`, `inspector-preview.png`, `inspector-packaged-vscode.log`. Build output and screenshots remain ignored.
+- v0.2.0 was installed successfully in the owner's normal VS Code profile. The owner confirmed that the inspector works and approved committing it. Run **Portal: Open React Native Inspector** with the development app and Metro running.
+- During validation, the original emulator/Metro processes exited; the same Resizable AVD was restarted headlessly and Tally's local Metro server restarted. No emulator data was erased.
+- Performance follow-up remains open: an inspector-connected drag run averaged 30.73 FPS; a separate baseline started near 60 FPS and then stalled at source FPS zero. A repeat lost the Metro target before measuring. Functional tests and packaged inspection pass, but sustained-60-FPS validation for v0.2.0 is not established. Details/commands are in VALIDATION.md.
+
+
 ## Presentation update — v0.1.2, 5 November 2026
 
 - Compact sidebar: one toolbar, connection dot, device name without repeated labels, icon navigation, compact FPS, expandable details and overflow settings.

@@ -7,6 +7,7 @@ const paths = {
   editor: '<path d="M14 3h7v7M21 3l-9 9M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/>',
   sidebar: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M9 4v16m8-11-3 3 3 3"/>',
   more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
+  inspect: '<path d="M9 3H3v6m12-6h6v6M3 15v6h6m5-9 7 3-4 2-2 4-3-7z"/>',
 };
 function icon(name: keyof typeof paths): string {
   return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">${paths[name]}</svg>`;
@@ -26,6 +27,7 @@ export function webviewHtml(options: HtmlOptions): string {
       <select id="devices" aria-label="Running emulator"><option>No running emulators</option></select>
       ${button('rotate', 'Rotate device', 'rotate', true)}${button('refresh', 'Refresh connection', 'refresh')}
       ${button(editor ? 'openSidebar' : 'openEditor', editor ? 'Move to Sidebar' : 'Open in Editor', editor ? 'sidebar' : 'editor')}
+      ${button('inspect', 'Inspect React Native component', 'inspect')}
       <div class="overflow"><button id="more" class="icon-button" title="More actions" aria-label="More actions" aria-haspopup="true" aria-expanded="false">${icon('more')}</button>
         <div id="menu" class="menu" hidden><button id="toggle-details" aria-pressed="false">Performance details</button><button data-button="settings">Settings</button></div>
       </div></header>

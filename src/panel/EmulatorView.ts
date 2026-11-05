@@ -61,11 +61,12 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
   }, 3);
   private readonly poll: ReturnType<typeof setInterval>;
 
-  constructor(private readonly context: vscode.ExtensionContext) {
+  private inspectorPicking = false;
+  constructor(private readonly context: vscode.ExtensionContext, private readonly openInspector?: () => Promise<void>) {
     this.selected = context.workspaceState.get('portal.selectedDevice');
     this.poll = setInterval(() => { if (this.active) void this.scan(); }, 2000);
     this.listeners.push(vscode.workspace.onDidChangeConfiguration(event => {
-      if (event.affectsConfiguration('portal')) {
+      if (['adbPath', 'sdkPath', 'discoveryPath', 'lowBandwidth', 'showPerformance', 'streamMode'].some(key => event.affectsConfiguration(`portal.${key}`))) {
         this.disconnect(); this.adb.stop();
         if (this.active) { this.adb.track(() => { void this.scan(); }); void this.scan(); }
         this.sendConfig();
@@ -171,11 +172,12 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (!surface.ready || surface.dead) return;
     const active = surface === this.current && surface.host.visible;
     void surface.host.webview.postMessage({ type: 'config', showStats: this.config.get('showPerformance', false),
-      mode: surface.kind, active, frameChannel: active ? surface.channel?.endpoint : undefined });
+      mode: surface.kind, active, inspectorPicking: this.inspectorPicking, frameChannel: active ? surface.channel?.endpoint : undefined });
     void surface.host.webview.postMessage({ type: 'status', ...this.status });
     void surface.host.webview.postMessage({ type: 'devices', devices: this.targets.map(({ serial, name }) => ({ serial, name })), selected: this.selected });
   }
   async refresh(): Promise<void> { this.disconnect(); await this.scan(); }
+  setInspectorPicking(value: boolean): void { this.inspectorPicking = value; this.sendConfig(); }
   private post(message: unknown): void { void this.view?.webview.postMessage(message); }
   private setStatus(state: string, message: string): void {
     this.status = { state, message }; this.post({ type: 'status', ...this.status });
@@ -315,6 +317,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
         if (generation === this.inputGeneration) await transport.touch([point]);
       }).catch(error => { if (generation === this.inputGeneration) this.report(error); }).finally(() => { --this.inputCount; });
     } else if (message.type === 'button') {
+      if (message.name === 'inspect') { await this.openInspector?.(); return; }
       if (message.name === 'openEditor') { await this.openEditor(); return; }
       if (message.name === 'openSidebar') { await this.openSidebar(); return; }
       if (message.name === 'refresh') { await this.refresh(); return; }

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.2.0
+
+- Add a React Native component inspector in a reusable VS Code editor tab, with an Inspect action in the emulator toolbar.
+- Connect to local Metro/Hermes development runtimes through the existing React Native DevTools bridge; no app dependency or external inspector window.
+- Add native element picking/highlighting, searchable component hierarchy, ancestors, props, hooks, state, context, nested value expansion, and native styles/layout.
+- Add capability-aware JSON live edits and workspace source navigation using React/Hermes metadata and Metro symbolication.
+- Recover from development reloads and runtime disconnects, stop picking on inspector close, and preserve the emulator streaming session.
+- Add protocol/source-boundary tests, production inspector webview tests, and live Tally/VS Code validation paths. The initial compatibility target is React Native 0.81.5 / Expo 54 with React DevTools bridge version 2.
+
 ## 0.1.2
 
 - Add a compact toolbar, connection indicator, icon navigation, and expandable performance details.
