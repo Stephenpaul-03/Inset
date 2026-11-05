@@ -1,10 +1,19 @@
 # VS Code Android Emulator Panel: v1 handoff
 
+## Presentation update — v0.1.2, 5 November 2026
+
+- Compact sidebar: one toolbar, connection dot, device name without repeated labels, icon navigation, compact FPS, expandable details and overflow settings.
+- Editor: **Portal: Open Emulator in Editor** (or toolbar pop-out), one reusable tab, Fit/50–200% zoom, scrollbar panning, and **Move to Sidebar**. Closing the editor returns to a visible sidebar.
+- Both surfaces share one transport/session. The parked surface closes its frame socket and accepts only presentation actions; transitions release held touches and invalidate queued input.
+- The browser test now uses the exact production HTML generator in `src/panel/html.ts` and checks zoomed/scrolled coordinates and portrait/landscape fitting. The VS Code suite checks session IDs across moves and benchmarks dragging in both presentations.
+- Local artifact: `artifacts/portal-emulator-0.1.2.vsix`, installed in the normal VS Code profile. Reload the window to activate, then review the layout and editor workflow in the normal workspace. Streaming quality limits and outstanding platform checks are unchanged.
+- Final complete-run drag means: 59.87 FPS in editor mode and 59.99 FPS in sidebar mode. The unpacked VSIX passed rendering, editor reuse, and session-preserving transitions. The owner reviewed and approved the new layout.
+
 ## Performance update — v0.1.1, 5 November 2026
 
 The installed v0.1.0 reproduced low FPS at 738×1640. Direct profiling showed a PNG capture/encoding bottleneck in the current emulator session. v0.1.1 defaults to raw RGBA over a loopback WebSocket, with a 0.6-megapixel resolution cap, input on the same channel, and a bounded three-frame window. PNG remains an optional bandwidth-saving mode. A full-resolution-cap VS Code test measured approximately 60 FPS through webview-originated dragging, retaining every sample after a fixed warmup. See VALIDATION.md. The original PNG decision below is historical and superseded by this measurement.
 
-### Resume checkpoint
+### Historical v0.1.1 checkpoint
 
 - v0.1.1 is packaged at `artifacts/portal-emulator-0.1.1.vsix` and installed in the owner's normal VS Code profile. Activation required **Developer: Reload Window**; performance in that workspace has not yet been confirmed.
 - Next: verify that the HUD shows `rgba · local` after activation and measure actual dragging in the normal workspace. Check image sharpness against the 0.6-megapixel cap before adjusting quality settings.

@@ -12,6 +12,14 @@ Environment: macOS arm64, Android Emulator 36.5.11, Resizable AVD, VS Code 1.144
 - Packaged VSIX smoke check: unpacked outside the project, launched in an isolated VS Code host, and verified activation, protocol loading, and real emulator-frame rendering without the project's node_modules.
 - Repository cleanup: core tests, VSIX packaging, and browser checks passed after replacing captured/generated image dependencies with a tracked neutral fixture. The live VS Code integration rerun could not attach because no emulator was running; the successful integration results above are from the earlier implementation run. Reconnect fixtures no longer require a prior live-emulator screenshot capture.
 
+## Compact sidebar and editor — v0.1.2
+
+- Browser checks use the production HTML and CSP. Passed: compact toolbar, hidden connected-status row, name-only device label, collapsible details, presentation actions, parked canvas, raw/PNG decoding, native pointer and wheel input, zoomed/scrolled hit mapping, and portrait/landscape Fit at narrow sizes. Previews: `artifacts/sidebar-preview.png`, `artifacts/editor-preview.png`, and `artifacts/editor-landscape-preview.png`.
+- VS Code checks passed for a single reusable editor tab, return to sidebar on editor close, explicit Move to Sidebar, and retention of the same emulator session ID across moves. Only the selected surface receives frames/input.
+- Full-cap (519×1153) drag benchmarks retained all eight samples after the fixed warmup. The complete run measured approximately **59.87 FPS in editor mode** and **59.99 FPS in sidebar mode**. Both used the local raw channel. Reports are in `artifacts/extension-validation.json` and `artifacts/performance-0.1.2.json`.
+- The unpacked v0.1.2 VSIX also passed activation, raw rendering, editor reuse, and session-preserving sidebar/editor transitions without project node_modules.
+- One earlier editor benchmark timed out during initialization; a subsequent complete run passed. Benchmark startup now focuses the canvas, matching the real pointer path. Normal-workspace startup, layout preferences, and long-session behavior still need user review.
+
 ## Performance — v0.1.1
 
 The installed v0.1.0 view reproduced approximately 14 FPS at 738×1640. Direct source profiling in the current emulator session measured about 9.7 FPS for PNG at width 738, 17.1 at width 540, 24.8 at width 470, and 48.9 at width 356. Raw RGBA measured about 59.1 FPS at width 470 and 56.9 at width 738. These measurements motivated switching formats and capping raw pixel count.

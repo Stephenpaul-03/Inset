@@ -14,5 +14,6 @@ export interface DeviceTransport {
   setViewport(width: number, height: number, dpr: number, lowBandwidth: boolean): void;
   setMode(mode: 'smooth' | 'png'): void;
   touch(points: TouchPoint[]): Promise<void>;
+  releaseTouches(): Promise<void>;
   stop(): void;
 }

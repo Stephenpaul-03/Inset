@@ -6,7 +6,9 @@ export function activate(context: vscode.ExtensionContext): void {
   context.subscriptions.push(provider, output,
     vscode.window.registerWebviewViewProvider('portal.emulator', provider, { webviewOptions: { retainContextWhenHidden: true } }),
     vscode.commands.registerCommand('portal.refresh', () => provider.refresh()),
-    vscode.commands.registerCommand('portal.open', () => vscode.commands.executeCommand('portal.emulator.focus')),
+    vscode.commands.registerCommand('portal.open', () => provider.openSidebar()),
+    vscode.commands.registerCommand('portal.openEditor', () => provider.openEditor()),
+    vscode.commands.registerCommand('portal.openSidebar', () => provider.openSidebar()),
     vscode.commands.registerCommand('portal.benchmark', async (stress = false) => {
       const report = await provider.benchmark(stress === true); output.appendLine(JSON.stringify(report, null, 2)); return report;
     }),

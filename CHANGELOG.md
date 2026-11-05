@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.1.2
+
+- Add a compact toolbar, connection indicator, icon navigation, and expandable performance details.
+- Add a reusable editor tab with Fit and zoom controls, scrollable panning, and native-coordinate input.
+- Share one emulator connection between sidebar and editor; park the other surface and return to the sidebar when the editor closes.
+- Test the production HTML, zoomed touch mapping, presentation switching, and full-cap dragging in both modes.
+
 ## 0.1.1
 
 - Make raw RGBA over a protected local binary channel the default to avoid emulator PNG encoding bottlenecks.

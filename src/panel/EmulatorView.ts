@@ -1,15 +1,25 @@
 import * as vscode from 'vscode';
-import { randomBytes } from 'node:crypto';
 import { Adb } from '../adb/adb';
 import { EmulatorTarget, findEmulators } from '../discovery/running';
 import { EmulatorGrpcTransport, readableGrpcError } from '../transport/EmulatorGrpcTransport';
 import type { Frame, TouchPoint } from '../transport/DeviceTransport';
 import { LatestFrameQueue } from './LatestFrameQueue';
 import { FrameChannel } from './FrameChannel';
+import { webviewHtml } from './html';
+
+type Presentation = 'sidebar' | 'editor';
+interface Surface {
+  kind: Presentation; host: vscode.WebviewView | vscode.WebviewPanel; ready: boolean; dead: boolean;
+  channel?: FrameChannel; listeners: vscode.Disposable[];
+  viewport: { width: number; height: number; dpr: number };
+}
 
 export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposable {
-  private view?: vscode.WebviewView;
-  private ready = false;
+  private current?: Surface;
+  private sidebar?: Surface;
+  private editor?: Surface;
+  private preferred: Presentation = 'sidebar';
+  private inputGeneration = 0;
   private disposed = false;
   private scanning = false;
   private rescan = false;
@@ -25,7 +35,6 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
   private inputTail = Promise.resolve();
   private inputCount = 0;
   private performance?: Record<string, number>;
-  private channel?: FrameChannel;
   private received: number[] = [];
   private sent: number[] = [];
   private measurement?: { started: number; stress: boolean; samples: unknown[]; resolve: (report: any) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> };
@@ -38,11 +47,12 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (this.channel?.connected) {
       if (!this.channel.send(frame, id)) this.queue.acknowledge(id);
     } else {
-    // ArrayBuffer is supported by VS Code's binary webview message transport.
-    const bytes = Uint8Array.from(frame.data).buffer;
-    void this.view?.webview.postMessage({ type: 'frame', id, ...frame, data: undefined, bytes }).then(sent => {
-      if (!sent && generation === this.generation) this.queue.reset();
-    });
+      const surface = this.current;
+      // ArrayBuffer is supported by VS Code's binary webview message transport.
+      const bytes = Uint8Array.from(frame.data).buffer;
+      void this.view?.webview.postMessage({ type: 'frame', id, ...frame, data: undefined, bytes }).then(sent => {
+        if (!sent && generation === this.generation && surface === this.current) this.queue.reset();
+      });
     }
     clearTimeout(this.ackTimer);
     this.ackTimer = setTimeout(() => {
@@ -63,33 +73,107 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     }));
   }
   private get config() { return vscode.workspace.getConfiguration('portal'); }
-  private get active() { return !this.disposed && !!this.view?.visible && this.ready; }
+  private get view() { return this.current?.host; }
+  private get channel() { return this.current?.channel; }
+  private get ready() { return this.current?.ready; }
+  private get active() { return !this.disposed && !!this.view?.visible && !!this.ready; }
 
-  async resolveWebviewView(view: vscode.WebviewView): Promise<void> {
-    this.view = view; this.ready = false;
-    view.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')] };
+  resolveWebviewView(view: vscode.WebviewView): void {
+    this.sidebar = this.createSurface(view, 'sidebar');
+    this.reconcile();
+  }
+  async openEditor(): Promise<void> {
+    this.preferred = 'editor';
+    if (this.editor) {
+      (this.editor.host as vscode.WebviewPanel).reveal(undefined, false);
+    } else {
+      const panel = vscode.window.createWebviewPanel('portal.editor', 'Emulator',
+        { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false }, { enableScripts: true, retainContextWhenHidden: true });
+      panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media/portal.svg');
+      this.editor = this.createSurface(panel, 'editor');
+    }
+    this.reconcile();
+  }
+  async openSidebar(): Promise<void> {
+    this.preferred = 'sidebar';
+    await vscode.commands.executeCommand('portal.emulator.focus');
+    (this.editor?.host as vscode.WebviewPanel | undefined)?.dispose();
+    this.reconcile();
+  }
+  private createSurface(host: vscode.WebviewView | vscode.WebviewPanel, kind: Presentation): Surface {
+    const surface: Surface = { host, kind, ready: false, dead: false, listeners: [], viewport: { width: 350, height: 900, dpr: 2 } };
+    host.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')] };
     const channel = new FrameChannel(message => {
-      const type = (message as any)?.type;
-      if (['ack', 'pointer', 'performance', 'benchmarkDone'].includes(type)) void this.receive(message).catch(error => this.report(error));
+      if (surface === this.current && ['ack', 'pointer', 'performance', 'benchmarkDone'].includes((message as any)?.type))
+        void this.receive(message).catch(error => this.report(error));
     }, () => {
+      if (surface !== this.current) return;
       this.queue.reset();
+      if (this.lastFrame && this.active) this.queue.offer(this.lastFrame);
+    });
+    surface.channel = channel;
+    surface.listeners.push(host.webview.onDidReceiveMessage(message => {
+      if (message?.type === 'ready') {
+        if (typeof message.origin === 'string' && message.origin.length < 512) surface.channel?.setOrigin(message.origin);
+        surface.ready = true;
+        this.sendSurfaceState(surface);
+        if (surface === this.current) { void this.receive(message).catch(error => this.report(error)); }
+      } else if (message?.type === 'button' && message.name === 'openSidebar') {
+        void this.openSidebar().catch(error => this.report(error));
+      } else if (message?.type === 'button' && message.name === 'openEditor') {
+        void this.openEditor().catch(error => this.report(error));
+      } else if (surface === this.current) {
+        void this.receive(message).catch(error => this.report(error));
+      }
+    }));
+    const visibility = () => this.reconcile();
+    surface.listeners.push(kind === 'sidebar' ? (host as vscode.WebviewView).onDidChangeVisibility(visibility) :
+      (host as vscode.WebviewPanel).onDidChangeViewState(visibility));
+    surface.listeners.push(host.onDidDispose(() => {
+      surface.dead = true; surface.listeners.forEach(listener => listener.dispose()); surface.channel?.dispose();
+      if (this.sidebar === surface) this.sidebar = undefined;
+      if (this.editor === surface) { this.editor = undefined; this.preferred = 'sidebar'; }
+      if (this.current === surface) { this.current = undefined; this.queue.reset(); clearTimeout(this.ackTimer); }
+      this.reconcile();
+    }));
+    void channel.start('').then(() => {
+      if (surface.dead || this.disposed) { channel.dispose(); return; }
+      host.webview.html = this.html(surface);
+    }).catch(() => {
+      channel.dispose(); surface.channel = undefined;
+      if (!surface.dead && !this.disposed) host.webview.html = this.html(surface);
+    });
+    return surface;
+  }
+  private reconcile(): void {
+    if (this.disposed) return;
+    const surfaces = [this.sidebar, this.editor].filter((s): s is Surface => !!s && !s.dead);
+    const next = surfaces.find(s => s.kind === this.preferred && s.host.visible) ||
+      surfaces.find(s => s === this.current && s.host.visible) || surfaces.find(s => s.host.visible);
+    if (!next) { this.disconnect(); this.adb.stop(); return; }
+    if (next !== this.current) {
+      ++this.inputGeneration;
+      if (this.measurement) {
+        clearTimeout(this.measurement.timer); this.measurement.reject(new Error('Performance measurement interrupted by moving the view.')); this.measurement = undefined;
+      }
+      void this.transport?.releaseTouches().catch(() => {});
+      this.queue.reset(); clearTimeout(this.ackTimer); this.performance = undefined;
+      this.current = next; this.viewport = next.viewport;
+    }
+    for (const surface of surfaces) this.sendSurfaceState(surface);
+    this.updateViewport();
+    if (this.active) {
       if (this.lastFrame) this.queue.offer(this.lastFrame);
-    });
-    try { await channel.start(''); this.channel = channel; }
-    catch { channel.dispose(); this.channel = undefined; }
-    view.webview.html = this.html(view.webview);
-    const subscriptions = [
-      view.webview.onDidReceiveMessage(message => { void this.receive(message).catch(error => this.report(error)); }),
-      view.onDidChangeVisibility(() => {
-        if (this.active) { this.adb.track(() => { void this.scan(); }); void this.scan(); }
-        else { this.disconnect(); this.adb.stop(); }
-      }),
-    ];
-    view.onDidDispose(() => {
-      subscriptions.forEach(s => s.dispose());
-      channel.dispose();
-      if (this.view === view) { this.disconnect(); this.adb.stop(); this.view = undefined; this.channel = undefined; this.ready = false; }
-    });
+      this.adb.track(() => { void this.scan(); }); void this.scan();
+    }
+  }
+  private sendSurfaceState(surface: Surface): void {
+    if (!surface.ready || surface.dead) return;
+    const active = surface === this.current && surface.host.visible;
+    void surface.host.webview.postMessage({ type: 'config', showStats: this.config.get('showPerformance', false),
+      mode: surface.kind, active, frameChannel: active ? surface.channel?.endpoint : undefined });
+    void surface.host.webview.postMessage({ type: 'status', ...this.status });
+    void surface.host.webview.postMessage({ type: 'devices', devices: this.targets.map(({ serial, name }) => ({ serial, name })), selected: this.selected });
   }
   async refresh(): Promise<void> { this.disconnect(); await this.scan(); }
   private post(message: unknown): void { void this.view?.webview.postMessage(message); }
@@ -99,8 +183,9 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
   private report(error: unknown): void {
     this.post({ type: 'notice', message: error instanceof Error ? error.message : 'Operation failed. Refresh and try again.' });
   }
-  private sendConfig(): void { this.post({ type: 'config', showStats: this.config.get('showPerformance', true),
-    lowBandwidth: this.config.get('lowBandwidth', false), frameChannel: this.channel?.endpoint }); }
+  private sendConfig(): void {
+    for (const surface of [this.sidebar, this.editor]) if (surface) this.sendSurfaceState(surface);
+  }
 
   private async scan(): Promise<void> {
     if (!this.active) return;
@@ -148,6 +233,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
       this.lastFrame = frame;
       this.received.push(Date.now()); this.received = this.received.slice(-240);
       if (this.status.state !== 'connected') this.setStatus('connected', target.name);
+      if (this.editor && this.editor.host.title !== `${target.name} — Emulator`) this.editor.host.title = `${target.name} — Emulator`;
       this.queue.offer(frame);
     });
     transport.onSizeChange((width, height) => {
@@ -169,7 +255,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (this.measurement) {
       clearTimeout(this.measurement.timer); this.measurement.reject(new Error('Performance measurement interrupted by a connection change.')); this.measurement = undefined;
     }
-    ++this.generation;
+    ++this.generation; ++this.inputGeneration;
     clearTimeout(this.ackTimer);
     this.queue.reset(); this.lastFrame = undefined;
     this.performance = undefined;
@@ -187,7 +273,6 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (!message || typeof message !== 'object') return;
     if (message.type === 'ready') {
       if (typeof message.origin === 'string' && message.origin.length < 512) this.channel?.setOrigin(message.origin);
-      this.ready = true;
       this.queue.reset(); this.sendConfig();
       this.post({ type: 'status', ...this.status });
       if (this.lastFrame) this.queue.offer(this.lastFrame);
@@ -198,6 +283,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (message.type === 'performance') {
       if (['fps', 'decodeMs', 'ageMs', 'width', 'height'].every(k => Number.isFinite(message[k]) && message[k] >= 0)) {
         this.performance = Object.fromEntries(['fps', 'decodeMs', 'ageMs', 'width', 'height'].map(k => [k, message[k]]));
+        for (const key of ['rafFps', 'documentHidden']) if (Number.isFinite(message[key])) this.performance[key] = message[key];
         this.post({ type: 'pipeline', sourceFps: this.received.filter(t => t >= Date.now() - 1000).length,
           channel: this.channel?.connected ? 'local' : 'bridge', format: this.lastFrame?.format || 'rgba' });
         if (this.measurement && Date.now() - this.measurement.started >= 2000) this.measurement.samples.push(this.diagnostics());
@@ -212,6 +298,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     } else if (message.type === 'viewport') {
       if (![message.width, message.height, message.dpr].every(v => Number.isFinite(v) && v > 0)) return;
       this.viewport = { width: Math.min(message.width, 10000), height: Math.min(message.height, 10000), dpr: Math.min(message.dpr, 4) };
+      if (this.current) this.current.viewport = this.viewport;
       this.updateViewport();
     } else if (message.type === 'selectDevice' && this.targets.some(t => t.serial === message.serial)) {
       this.selected = message.serial;
@@ -220,14 +307,16 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     } else if (message.type === 'pointer' && ['down', 'move', 'up'].includes(message.action)) {
       if (!Number.isFinite(message.x) || !Number.isFinite(message.y) || !Number.isInteger(message.id) || message.id < 0 || message.id > 9) return;
       const transport = this.transport;
-      const generation = this.generation;
+      const generation = this.inputGeneration;
       if (!transport || (this.inputCount > 20 && message.action === 'move')) return;
       const point: TouchPoint = { x: message.x, y: message.y, id: message.id, down: message.action !== 'up' };
       ++this.inputCount;
       this.inputTail = this.inputTail.then(async () => {
-        if (generation === this.generation) await transport.touch([point]);
-      }).catch(error => { if (generation === this.generation) this.report(error); }).finally(() => { --this.inputCount; });
+        if (generation === this.inputGeneration) await transport.touch([point]);
+      }).catch(error => { if (generation === this.inputGeneration) this.report(error); }).finally(() => { --this.inputCount; });
     } else if (message.type === 'button') {
+      if (message.name === 'openEditor') { await this.openEditor(); return; }
+      if (message.name === 'openSidebar') { await this.openSidebar(); return; }
       if (message.name === 'refresh') { await this.refresh(); return; }
       if (message.name === 'settings') { await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:local.portal-emulator'); return; }
       if (!this.selected || !this.transport) return;
@@ -239,32 +328,29 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
   benchmark(stress = false): Promise<unknown> {
     if (!this.active || !this.lastFrame || this.measurement) return Promise.reject(new Error('Open a connected emulator with a long scrollable list before measuring performance.'));
     return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => { this.measurement = undefined; this.updateViewport(); reject(new Error('Performance measurement timed out.')); }, 20000);
+      const timer = setTimeout(() => { this.measurement = undefined; this.updateViewport(); reject(new Error(`Performance measurement timed out: ${JSON.stringify(this.diagnostics())}`)); }, 20000);
       this.measurement = { started: Date.now(), stress, samples: [], resolve, reject, timer };
       this.updateViewport();
       this.post({ type: 'benchmark', durationMs: 10000 });
     });
   }
   diagnostics() {
-    return { version: this.context.extension.packageJSON.version, status: this.status, visible: this.active, selected: this.selected,
+    return { presentation: this.current?.kind, sessionId: this.generation, editorOpen: !!this.editor,
+      version: this.context.extension.packageJSON.version, status: this.status, visible: this.active, selected: this.selected,
       devices: this.targets.map(({ serial, name, grpcPort }) => ({ serial, name, grpcAvailable: !!grpcPort })),
       native: this.lastFrame ? { width: this.lastFrame.nativeWidth, height: this.lastFrame.nativeHeight } : undefined,
       performance: this.performance, pipeline: { channel: this.channel?.connected ? 'local' : 'bridge', format: this.lastFrame?.format,
         sourceFps: this.received.filter(t => t >= Date.now() - 1000).length, sentFps: this.sent.filter(t => t >= Date.now() - 1000).length } };
   }
-  private html(webview: vscode.Webview): string {
-    const nonce = randomBytes(18).toString('base64');
-    const asset = (name: string) => webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', name));
-    return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob:; connect-src ${this.channel?.cspOrigin || "'none'"}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
-      <link rel="stylesheet" href="${asset('webview.css')}"><title>Portal Emulator</title></head>
-      <body><header><label for="devices">Running emulator</label><div class="picker"><select id="devices" aria-label="Running emulator"></select><button data-button="refresh" title="Refresh connection" aria-label="Refresh connection">↻</button><button data-button="settings" title="Portal settings" aria-label="Portal settings">⚙</button></div></header>
-      <div id="status" role="status">Start an Android emulator in Android Studio.</div><div id="notice" role="alert" hidden></div>
-      <main id="stage"><canvas id="screen" tabindex="0" aria-label="Android emulator screen. Use pointer to tap or drag, wheel to scroll."></canvas><p id="empty">Your running Android emulator will appear here.</p></main>
-      <nav aria-label="Emulator controls"><button data-button="back" title="Back">Back</button><button data-button="home" title="Home">Home</button><button data-button="recents" title="Recent apps">Recents</button><button data-button="rotate" title="Rotate device">Rotate</button></nav>
-      <footer id="stats" aria-label="Rendering performance">Waiting for frames…</footer><script nonce="${nonce}" src="${asset('webview.js')}"></script></body></html>`;
+  private html(surface: Surface): string {
+    const webview = surface.host.webview;
+    const asset = (name: string) => webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', name)).toString();
+    return webviewHtml({ cspSource: webview.cspSource, connectOrigin: surface.channel?.cspOrigin,
+      styleUri: asset('webview.css'), scriptUri: asset('webview.js'), mode: surface.kind });
   }
   dispose(): void {
-    this.disposed = true; clearInterval(this.poll); this.disconnect(); this.channel?.dispose(); this.adb.stop(); this.listeners.forEach(s => s.dispose());
+    this.disposed = true; clearInterval(this.poll); this.disconnect(); this.adb.stop();
+    for (const surface of [this.sidebar, this.editor]) { surface?.channel?.dispose(); surface?.listeners.forEach(listener => listener.dispose()); }
+    (this.editor?.host as vscode.WebviewPanel | undefined)?.dispose(); this.listeners.forEach(s => s.dispose());
   }
 }

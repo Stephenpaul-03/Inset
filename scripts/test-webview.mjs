@@ -4,15 +4,11 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import { FrameChannel } from '../out/src/panel/FrameChannel.js';
+import { webviewHtml } from '../out/src/panel/html.js';
 const root = path.resolve(import.meta.dirname, '..');
-const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/media/webview.css"></head><body>
-<header><label for="devices">Running emulator</label><div class="picker"><select id="devices"></select><button data-button="refresh">↻</button></div></header>
-<div id="status"></div><div id="notice" hidden></div><main id="stage"><canvas id="screen"></canvas><p id="empty">Your running Android emulator will appear here.</p></main>
-<nav><button data-button="back">Back</button><button data-button="home">Home</button><button data-button="recents">Recents</button><button data-button="rotate">Rotate</button></nav><footer id="stats"></footer>
-<script>window.messages=[];window.acquireVsCodeApi=()=>({postMessage:m=>messages.push(m)});</script><script src="/media/webview.js"></script></body></html>`;
 const server = http.createServer(async (req, res) => {
   try {
-    if (req.url === '/') { res.setHeader('Content-Type', 'text/html'); res.end(html); return; }
+    if (req.url === '/' || req.url === '/editor') { res.setHeader('Content-Type', 'text/html'); res.end(webviewHtml({ cspSource: `http://127.0.0.1:${server.address().port}`, connectOrigin: channel.cspOrigin, styleUri: '/media/webview.css', scriptUri: '/media/webview.js', mode: req.url === '/editor' ? 'editor' : 'sidebar' })); return; }
     const files = { '/media/webview.js': ['media/webview.js', 'text/javascript'], '/media/webview.css': ['media/webview.css', 'text/css'], '/fixture.png': ['test/fixtures/screen.png', 'image/png'] };
     const file = files[req.url]; if (!file) { res.writeHead(404).end(); return; }
     res.setHeader('Content-Type', file[1]); res.end(await fs.readFile(path.join(root, file[0])));
@@ -26,16 +22,26 @@ const browser = await chromium.launch({ executablePath: '/Applications/Google Ch
 try {
   const page = await browser.newPage({ viewport: { width: 380, height: 900 }, deviceScaleFactor: 2 });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
+  await page.addInitScript(() => { window.messages = []; let state; window.acquireVsCodeApi = () => ({ postMessage: message => messages.push(message), getState: () => state, setState: value => { state = value; } }); });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  await page.evaluate(async () => {
-    const image = await createImageBitmap(await (await fetch('/fixture.png')).blob());
+  const pngFixture = [...await fs.readFile(path.join(root, 'test/fixtures/screen.png'))];
+  await page.evaluate(async bytes => {
+    const image = await createImageBitmap(new Blob([new Uint8Array(bytes)], { type: 'image/png' }));
     const c = document.createElement('canvas'); c.width = 540; c.height = 1200; c.getContext('2d').drawImage(image, 0, 0, 540, 1200); image.close();
     window.fixture = await (await new Promise(resolve => c.toBlob(resolve, 'image/png'))).arrayBuffer();
     window.postMessage({ type: 'devices', devices: [{ serial: 'emulator-5554', name: 'Resizable' }], selected: 'emulator-5554' });
+    window.postMessage({ type: 'config', active: true, mode: 'sidebar', showStats: false });
     window.postMessage({ type: 'status', state: 'connected', message: 'Resizable' });
     window.postMessage({ type: 'frame', id: 1, bytes: fixture, nativeWidth: 1080, nativeHeight: 2400, arrivedAt: Date.now() });
-  });
+  }, pngFixture);
   await page.waitForSelector('canvas.live');
+  assert.equal(await page.locator('#status').isVisible(), false);
+  assert.equal(await page.locator('#stats').isVisible(), false);
+  assert.equal(await page.locator('#devices option:checked').textContent(), 'Resizable');
+  await page.locator('#fps').click(); assert.equal(await page.locator('#stats').isVisible(), true);
+  await page.locator('#fps').click(); assert.equal(await page.locator('#stats').isVisible(), false);
+  await page.getByRole('button', { name: 'Open in Editor', exact: true }).click();
+  assert.ok(await page.evaluate(() => messages.some(m => m.type === 'button' && m.name === 'openEditor')));
   const rect = await page.locator('canvas').boundingBox();
   await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
   const points = await page.evaluate(() => messages.filter(m => m.type === 'pointer'));
@@ -49,7 +55,7 @@ try {
   await page.waitForFunction(() => messages.some(m => m.type === 'ack' && m.id === 2));
   await page.evaluate(() => window.postMessage({ type: 'frame', id: 3, bytes: fixture, nativeWidth: 1080, nativeHeight: 2400, arrivedAt: Date.now() }));
   await page.waitForFunction(() => messages.some(m => m.type === 'ack' && m.id === 3));
-  await page.evaluate(url => window.postMessage({ type: 'config', showStats: true, frameChannel: url }), channel.endpoint);
+  await page.evaluate(url => window.postMessage({ type: 'config', showStats: false, frameChannel: url }), channel.endpoint);
   for (let i = 0; i < 100 && !channel.connected; i++) await page.waitForTimeout(10);
   assert.ok(channel.connected, 'Browser must open the local binary channel');
   const raw = new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
@@ -67,8 +73,50 @@ try {
   await page.screenshot({ path: path.join(root, 'artifacts/sidebar-preview.png') });
   await page.setViewportSize({ width: 240, height: 480 }); await page.waitForTimeout(250);
   const narrow = await page.locator('canvas').boundingBox();
-  assert.ok(narrow.width <= 216 && narrow.height < 480);
+  assert.ok(narrow.width <= 228 && narrow.height < 480);
+  await page.evaluate(() => window.postMessage({ type: 'config', active: false, mode: 'sidebar' }));
+  await page.waitForSelector('body.parked');
+  assert.equal(await page.getByRole('button', { name: 'Move to Sidebar', exact: true }).isVisible(), true);
+  assert.equal(await page.locator('canvas').isVisible(), false);
+  await page.getByRole('button', { name: 'Move to Sidebar', exact: true }).click();
+  assert.ok(await page.evaluate(() => messages.some(m => m.type === 'button' && m.name === 'openSidebar')));
   await page.evaluate(() => window.postMessage({ type: 'reset' })); await page.waitForSelector('canvas.live', { state: 'hidden' });
+  const editor = await browser.newPage({ viewport: { width: 760, height: 600 }, deviceScaleFactor: 2 });
+  await editor.addInitScript(() => { window.messages = []; window.acquireVsCodeApi = () => ({ postMessage: message => messages.push(message) }); });
+  editor.on('pageerror', e => errors.push(e.message));
+  await editor.goto(`http://127.0.0.1:${server.address().port}/editor`);
+  await editor.evaluate(bytes => {
+    window.postMessage({ type: 'config', active: true, mode: 'editor', showStats: false });
+    window.postMessage({ type: 'devices', devices: [{ serial: 'emulator-5554', name: 'Resizable' }], selected: 'emulator-5554' });
+    window.postMessage({ type: 'status', state: 'connected', message: 'Resizable' });
+    window.postMessage({ type: 'frame', id: 10, format: 'png', bytes: new Uint8Array(bytes), nativeWidth: 1080, nativeHeight: 2400, arrivedAt: Date.now() });
+  }, pngFixture);
+  await editor.waitForSelector('canvas.live');
+  await editor.locator('#zoom').selectOption('1');
+  await editor.waitForTimeout(200);
+  const editorCanvas = await editor.locator('canvas').boundingBox();
+  assert.equal(editorCanvas.width, 540); assert.equal(editorCanvas.height, 1200);
+  await editor.locator('#stage').evaluate(stage => { stage.scrollTop = 300; });
+  const stageRect = await editor.locator('#stage').boundingBox();
+  const screenRect = await editor.locator('canvas').boundingBox();
+  const clickY = stageRect.y + stageRect.height / 2;
+  await editor.mouse.click(screenRect.x + screenRect.width / 2, clickY);
+  const zoomPointer = await editor.evaluate(() => messages.find(m => m.type === 'pointer' && m.action === 'down'));
+  assert.ok(Math.abs(zoomPointer.x - 540) <= 1);
+  assert.ok(Math.abs(zoomPointer.y - (clickY - screenRect.y) / screenRect.height * 2400) <= 1);
+  await editor.locator('#zoom').selectOption('fit');
+  await editor.waitForTimeout(200);
+  const fitRect = await editor.locator('canvas').boundingBox();
+  assert.ok(fitRect.width < 540 && fitRect.height < 600);
+  await editor.screenshot({ path: path.join(root, 'artifacts/editor-preview.png') });
+  await editor.setViewportSize({ width: 540, height: 380 });
+  await editor.evaluate(bytes => window.postMessage({ type: 'frame', id: 11, format: 'png', bytes: new Uint8Array(bytes), nativeWidth: 2400, nativeHeight: 1080, arrivedAt: Date.now() }), pngFixture);
+  await editor.waitForTimeout(200);
+  const landscape = await editor.locator('canvas').boundingBox();
+  assert.ok(Math.abs(landscape.width / landscape.height - 2400 / 1080) < .01);
+  assert.ok(landscape.width <= 524 && landscape.height < 380);
+  await editor.screenshot({ path: path.join(root, 'artifacts/editor-landscape-preview.png') });
+  await editor.close();
   assert.deepEqual(errors, []);
   console.log('Browser checks passed: PNG decode/recovery, raw binary decode/pixels, local-channel input, native input mapping, wheel, release on blur, resize, reset.');
 } finally { await browser.close(); channel.dispose(); server.close(); }

@@ -1,8 +1,8 @@
 {
   "name": "portal-emulator",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "private": true,
-  "description": "View and control an already-running Android emulator in the VS Code sidebar.",
+  "description": "View and control a running Android emulator in a compact sidebar or editor tab.",
   "main": "./dist/extension.js",
   "scripts": {
     "build": "npm run typecheck && node scripts/build.mjs",
@@ -61,6 +61,14 @@
       {
         "command": "portal.benchmark",
         "title": "Portal: Measure Scrolling Performance"
+      },
+      {
+        "command": "portal.openEditor",
+        "title": "Portal: Open Emulator in Editor"
+      },
+      {
+        "command": "portal.openSidebar",
+        "title": "Portal: Move Emulator to Sidebar"
       }
     ],
     "viewsContainers": {
@@ -77,7 +85,7 @@
         {
           "type": "webview",
           "id": "portal.emulator",
-          "name": "Android Emulator"
+          "name": "Emulator"
         }
       ]
     },
@@ -109,8 +117,8 @@
         },
         "portal.showPerformance": {
           "type": "boolean",
-          "default": true,
-          "description": "Show drawn FPS, source FPS, streaming mode/channel, draw time, and frame age."
+          "default": false,
+          "description": "Expand performance details by default. The compact FPS indicator remains visible."
         },
         "portal.streamMode": {
           "type": "string",

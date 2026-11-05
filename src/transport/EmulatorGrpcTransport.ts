@@ -184,6 +184,10 @@ export class EmulatorGrpcTransport implements DeviceTransport {
     const current = state.value?.data || [0, 0, 0];
     await this.call('setPhysicalModel', { target: 'ROTATION', value: { data: [current[0], current[1], (current[2] + 90) % 360] } });
   }
+  async releaseTouches(): Promise<void> {
+    const points = [...this.activeTouches.values()].map(point => ({ ...point, down: false }));
+    if (points.length) await this.touch(points);
+  }
   stop(): void {
     ++this.generation;
     ++this.streamGeneration;
