@@ -31,6 +31,20 @@ test('adaptive size fits width, height, native resolution, and bandwidth limit',
   assert.deepEqual(requestSize(1080, 2400, 5000, 5000, 2, false), { width: 1080, height: 2400 });
   assert.equal(clampCoordinate(-10, 1080), 0);
   assert.equal(clampCoordinate(1080, 1080), 1079);
+  const raw = requestSize(1080, 2400, 4000, 4000, 2, false, 600000);
+  assert.ok(raw.width * raw.height <= 600000);
+  assert.ok(Math.abs(raw.width / raw.height - 1080 / 2400) < .001);
+});
+
+test('frame window pipelines delivery and keeps only the newest pending frame', () => {
+  const sent: [number, number][] = [];
+  const queue = new LatestFrameQueue<number>((value, id) => sent.push([value, id]), 3);
+  for (let i = 0; i < 100; i++) queue.offer(i);
+  assert.deepEqual(sent.map(([value]) => value), [0, 1, 2]);
+  queue.acknowledge(sent[1][1]);
+  assert.equal(sent[3][0], 99);
+  const staleId = sent[2][1]; queue.reset(); queue.offer(100);
+  queue.acknowledge(staleId); assert.equal(sent.length, 5);
 });
 
 test('frame queue stays bounded and ignores stale acknowledgments across resets', () => {

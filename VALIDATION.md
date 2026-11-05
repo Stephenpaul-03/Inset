@@ -12,11 +12,19 @@ Environment: macOS arm64, Android Emulator 36.5.11, Resizable AVD, VS Code 1.144
 - Packaged VSIX smoke check: unpacked outside the project, launched in an isolated VS Code host, and verified activation, protocol loading, and real emulator-frame rendering without the project's node_modules.
 - Repository cleanup: core tests, VSIX packaging, and browser checks passed after replacing captured/generated image dependencies with a tracked neutral fixture. The live VS Code integration rerun could not attach because no emulator was running; the successful integration results above are from the earlier implementation run. Reconnect fixtures no longer require a prior live-emulator screenshot capture.
 
-## Performance
+## Performance — v0.1.1
 
-The real VS Code webview drew approximately 59–60 FPS in steady active-scrolling samples at 470×1044 streamed resolution. Decode averaged approximately 2.5–3.6 ms in the final run, and receipt-to-draw age approximately 3.1–4.3 ms. Startup and idle samples were lower because frames are change-driven. The integration check requires multiple active samples and a mean of at least 55 FPS across those samples.
+The installed v0.1.0 view reproduced approximately 14 FPS at 738×1640. Direct source profiling in the current emulator session measured about 9.7 FPS for PNG at width 738, 17.1 at width 540, 24.8 at width 470, and 48.9 at width 356. Raw RGBA measured about 59.1 FPS at width 470 and 56.9 at width 738. These measurements motivated switching formats and capping raw pixel count.
 
-Raw diagnostics are saved in `artifacts/extension-validation.json`; the browser preview is `artifacts/sidebar-preview.png`. The HUD's frame age excludes time before the extension receives a frame.
+The v0.1.1 VS Code integration test drives input from the webview through the production local channel, instead of calling the transport directly. It stresses the 0.6-megapixel cap (519×1153 on this phone) and retains **all eight samples after an explicit two-second warmup**. The measured mean was **60.002 FPS**, the range was **59.988–60.030 FPS**, and source FPS was 60 in every sample. Receipt-to-draw age averaged approximately 0.9 ms. Timing-window rounding can produce a count slightly above 60; this is not a claim of a higher-refresh display.
+
+Checks also passed for local-channel capability/Origin rejection, binary packet integrity, real raw pixel decoding, raw-to-PNG pixel agreement (zero mean error on a static screen), rotation, phone/foldable/tablet modes, hide/resume, refresh, and simulated port/token replacement/authentication recovery.
+
+Raw diagnostics are saved in `artifacts/extension-validation.json` and `artifacts/performance-0.1.1.json`; the browser preview is `artifacts/sidebar-preview.png`. Frame age excludes emulator rendering and gRPC delivery. The default mode trades some Retina sharpness for a 60 FPS target and transfers more local data than PNG. A new package must be activated in the user's regular VS Code window before its performance there is confirmed.
+
+### Historical v0.1.0 result and test limitation
+
+The earlier 59–60 FPS result used PNG at 470×1044, direct transport-generated input, and a filter that selected samples already above 50 FPS. It did not establish performance at the user's larger panel size or through the webview input path. That test has been replaced; the old result should not be treated as proof of normal-workspace 60 FPS.
 
 ## Still needs manual validation
 

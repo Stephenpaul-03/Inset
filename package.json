@@ -1,6 +1,6 @@
 {
   "name": "portal-emulator",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "View and control an already-running Android emulator in the VS Code sidebar.",
   "main": "./dist/extension.js",
@@ -8,18 +8,21 @@
     "build": "npm run typecheck && node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsc && node --test out/test/*.test.js",
-    "test:webview": "node scripts/test-webview.mjs",
+    "test:webview": "tsc && node scripts/test-webview.mjs",
     "test:emulator": "tsc && node scripts/test-emulator.cjs",
     "test:extension": "tsc && node scripts/test-extension.cjs",
     "vscode:prepublish": "npm run build",
-    "package": "vsce package --no-dependencies --allow-missing-repository --out artifacts/portal-emulator-0.1.0.vsix"
+    "package": "node scripts/package.mjs",
+    "test:channel": "tsc && node --test out/test/channel.integration.js"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
-    "@grpc/proto-loader": "^0.7.13"
+    "@grpc/proto-loader": "^0.7.13",
+    "ws": "^8.22.1"
   },
   "devDependencies": {
     "@types/vscode": "^1.95.0",
+    "@types/ws": "^8.18.2",
     "@vscode/test-electron": "^3.1.0",
     "@vscode/vsce": "^4.1.0",
     "esbuild": "^0.28.2",
@@ -54,6 +57,10 @@
       {
         "command": "portal.diagnostics",
         "title": "Portal: Show Diagnostics"
+      },
+      {
+        "command": "portal.benchmark",
+        "title": "Portal: Measure Scrolling Performance"
       }
     ],
     "viewsContainers": {
@@ -98,12 +105,25 @@
         "portal.lowBandwidth": {
           "type": "boolean",
           "default": false,
-          "description": "Limit PNG streaming to at most one third of native resolution."
+          "description": "Use PNG and cap resolution at one third of native size; encoding can reduce FPS."
         },
         "portal.showPerformance": {
           "type": "boolean",
           "default": true,
-          "description": "Show drawn FPS, PNG decode time, and frame age."
+          "description": "Show drawn FPS, source FPS, streaming mode/channel, draw time, and frame age."
+        },
+        "portal.streamMode": {
+          "type": "string",
+          "enum": [
+            "smooth",
+            "png"
+          ],
+          "enumDescriptions": [
+            "Raw RGBA over a local binary channel, capped in resolution for a 60 FPS target.",
+            "PNG compression to reduce bandwidth; encoding may reduce FPS."
+          ],
+          "default": "smooth",
+          "description": "Emulator streaming mode."
         }
       }
     }

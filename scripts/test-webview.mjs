@@ -3,6 +3,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { FrameChannel } from '../out/src/panel/FrameChannel.js';
 const root = path.resolve(import.meta.dirname, '..');
 const html = `<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/media/webview.css"></head><body>
 <header><label for="devices">Running emulator</label><div class="picker"><select id="devices"></select><button data-button="refresh">↻</button></div></header>
@@ -18,6 +19,9 @@ const server = http.createServer(async (req, res) => {
   } catch { res.writeHead(500).end(); }
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+const channelMessages = [];
+const channel = new FrameChannel(message => channelMessages.push(message), () => {});
+await channel.start(`http://127.0.0.1:${server.address().port}`);
 const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
 try {
   const page = await browser.newPage({ viewport: { width: 380, height: 900 }, deviceScaleFactor: 2 });
@@ -45,6 +49,19 @@ try {
   await page.waitForFunction(() => messages.some(m => m.type === 'ack' && m.id === 2));
   await page.evaluate(() => window.postMessage({ type: 'frame', id: 3, bytes: fixture, nativeWidth: 1080, nativeHeight: 2400, arrivedAt: Date.now() }));
   await page.waitForFunction(() => messages.some(m => m.type === 'ack' && m.id === 3));
+  await page.evaluate(url => window.postMessage({ type: 'config', showStats: true, frameChannel: url }), channel.endpoint);
+  for (let i = 0; i < 100 && !channel.connected; i++) await page.waitForTimeout(10);
+  assert.ok(channel.connected, 'Browser must open the local binary channel');
+  const raw = new Uint8Array([255, 0, 0, 255, 0, 255, 0, 255, 0, 0, 255, 255, 255, 255, 255, 255]);
+  channel.send({ width: 2, height: 2, nativeWidth: 1080, nativeHeight: 2400, data: raw, format: 'rgba', arrivedAt: Date.now() }, 4);
+  for (let i = 0; i < 100 && !channelMessages.some(m => m.type === 'ack' && m.id === 4); i++) await page.waitForTimeout(10);
+  assert.ok(channelMessages.some(m => m.type === 'ack' && m.id === 4));
+  assert.deepEqual(await page.evaluate(() => [...document.getElementById('screen').getContext('2d').getImageData(0, 0, 1, 1).data]), [255, 0, 0, 255]);
+  await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2);
+  await page.waitForTimeout(30);
+  assert.ok(channelMessages.some(m => m.type === 'pointer' && m.action === 'down' && Math.abs(m.x - 540) <= 1));
+  channel.send({ width: 540, height: 1200, nativeWidth: 1080, nativeHeight: 2400, data: await fs.readFile(path.join(root, 'test/fixtures/screen.png')), format: 'png', arrivedAt: Date.now() }, 5);
+  for (let i = 0; i < 100 && !channelMessages.some(m => m.type === 'ack' && m.id === 5); i++) await page.waitForTimeout(10);
   await page.evaluate(() => window.postMessage({ type: 'notice', message: '' }));
   await fs.mkdir(path.join(root, 'artifacts'), { recursive: true });
   await page.screenshot({ path: path.join(root, 'artifacts/sidebar-preview.png') });
@@ -53,5 +70,5 @@ try {
   assert.ok(narrow.width <= 216 && narrow.height < 480);
   await page.evaluate(() => window.postMessage({ type: 'reset' })); await page.waitForSelector('canvas.live', { state: 'hidden' });
   assert.deepEqual(errors, []);
-  console.log('Browser checks passed: PNG decode/recovery, native input mapping, wheel, release on blur, resize, reset.');
-} finally { await browser.close(); server.close(); }
+  console.log('Browser checks passed: PNG decode/recovery, raw binary decode/pixels, local-channel input, native input mapping, wheel, release on blur, resize, reset.');
+} finally { await browser.close(); channel.dispose(); server.close(); }

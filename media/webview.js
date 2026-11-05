@@ -2,7 +2,27 @@
 (() => {
   'use strict';
   const vscode = acquireVsCodeApi();
-  const send = message => vscode.postMessage(message);
+  let socket, socketUrl, reconnectTimer;
+  const send = message => {
+    if (socket?.readyState === WebSocket.OPEN && ['ack', 'pointer', 'performance'].includes(message.type)) socket.send(JSON.stringify(message));
+    else vscode.postMessage(message);
+  };
+  function connectChannel(url) {
+    if (!url || (socketUrl === url && socket && socket.readyState < WebSocket.CLOSING)) return;
+    socketUrl = url; clearTimeout(reconnectTimer); socket?.close();
+    const connection = new WebSocket(url); socket = connection; connection.binaryType = 'arraybuffer';
+    connection.onmessage = event => {
+      const buffer = event.data;
+      if (!(buffer instanceof ArrayBuffer) || buffer.byteLength < 40) return;
+      const header = new DataView(buffer);
+      if (header.getUint32(0, true) !== 0x5052544c) return;
+      acceptFrame({ id: header.getUint32(4, true), width: header.getUint32(8, true), height: header.getUint32(12, true),
+        nativeWidth: header.getUint32(16, true), nativeHeight: header.getUint32(20, true), arrivedAt: header.getFloat64(24, true),
+        format: header.getUint32(32, true) === 1 ? 'rgba' : 'png', bytes: new Uint8Array(buffer, 40) });
+    };
+    connection.onclose = () => { if (socket === connection) reconnectTimer = setTimeout(() => connectChannel(url), 1000); };
+    connection.onerror = () => connection.close();
+  }
   const canvas = document.getElementById('screen');
   const stage = document.getElementById('stage');
   const ctx = canvas.getContext('2d', { alpha: false });
@@ -18,6 +38,7 @@
   const moves = new Map();
   let moveScheduled = false, wheel = false, wheelGeneration = 0;
   let wheelPoint;
+  let sourceFps = 0, frameFormat = 'rgba', channelName = 'bridge';
 
   function enabled(value) { document.querySelectorAll('nav button').forEach(button => { button.disabled = !value; }); }
   enabled(false);
@@ -48,27 +69,37 @@
       const generation = epoch;
       const started = performance.now();
       try {
-        const bitmap = await createImageBitmap(new Blob([frame.bytes], { type: 'image/png' }));
+        let bitmap;
+        if (frame.format !== 'rgba') bitmap = await createImageBitmap(new Blob([frame.bytes], { type: 'image/png' }));
         if (generation === epoch) {
           nativeWidth = frame.nativeWidth; nativeHeight = frame.nativeHeight;
-          if (canvas.width !== bitmap.width || canvas.height !== bitmap.height) { canvas.width = bitmap.width; canvas.height = bitmap.height; }
-          ctx.drawImage(bitmap, 0, 0);
+          const width = bitmap?.width || frame.width, height = bitmap?.height || frame.height;
+          if (canvas.width !== width || canvas.height !== height) { canvas.width = width; canvas.height = height; }
+          if (bitmap) ctx.drawImage(bitmap, 0, 0);
+          else {
+            const bytes = frame.bytes instanceof ArrayBuffer ? new Uint8Array(frame.bytes) : frame.bytes;
+            if (bytes.byteLength !== width * height * 4) throw new Error('Invalid raw frame');
+            ctx.putImageData(new ImageData(new Uint8ClampedArray(bytes.buffer, bytes.byteOffset, bytes.byteLength), width, height), 0, 0);
+          }
           fitCanvas();
           canvas.classList.add('live'); empty.hidden = true; enabled(true);
           drawn++; decodeTotal += performance.now() - started; ageTotal += Math.max(0, Date.now() - frame.arrivedAt);
         }
-        bitmap.close();
+        bitmap?.close();
       } catch { showNotice('Could not decode a frame. Refresh the connection.'); }
       finally { send({ type: 'ack', id: frame.id }); }
     }
     decoding = false;
   }
+  function acceptFrame(message) {
+    if (pending) send({ type: 'ack', id: pending.id });
+    pending = message; void render();
+  }
   window.addEventListener('message', event => {
     const message = event.data;
     if (!message || typeof message !== 'object') return;
     if (message.type === 'frame') {
-      if (pending) send({ type: 'ack', id: pending.id });
-      pending = message; void render();
+      acceptFrame(message);
     } else if (message.type === 'devices') {
       devices.replaceChildren();
       if (!message.devices.length || !message.devices.some(d => d.serial === message.selected)) {
@@ -83,7 +114,9 @@
       status.textContent = message.message; status.dataset.state = message.state;
       if (message.state !== 'connected') enabled(false);
     } else if (message.type === 'notice') showNotice(message.message);
-    else if (message.type === 'config') { stats.hidden = !message.showStats; }
+    else if (message.type === 'config') { stats.hidden = !message.showStats; connectChannel(message.frameChannel); }
+    else if (message.type === 'pipeline') { sourceFps = message.sourceFps; frameFormat = message.format; channelName = message.channel; }
+    else if (message.type === 'benchmark') { void benchmark(message.durationMs); }
     else if (message.type === 'reset') {
       releaseAll(); cancelWheel(); ++epoch;
       if (pending) send({ type: 'ack', id: pending.id });
@@ -96,7 +129,7 @@
     const now = performance.now();
     send({ type: 'performance', fps: drawn * 1000 / (now - intervalStart), decodeMs: drawn ? decodeTotal / drawn : 0,
       ageMs: drawn ? ageTotal / drawn : 0, width: canvas.width, height: canvas.height });
-    stats.textContent = drawn ? `${(drawn * 1000 / (now - intervalStart)).toFixed(0)} fps · decode ${(decodeTotal / drawn).toFixed(1)} ms · age ${(ageTotal / drawn).toFixed(0)} ms · ${canvas.width}×${canvas.height}` : 'Idle · frames arrive when the screen changes';
+    stats.textContent = drawn ? `${(drawn * 1000 / (now - intervalStart)).toFixed(0)} fps · source ${sourceFps} · ${frameFormat} · ${channelName} · draw ${(decodeTotal / drawn).toFixed(1)} ms · age ${(ageTotal / drawn).toFixed(0)} ms · ${canvas.width}×${canvas.height}` : 'Idle · frames arrive when the screen changes';
     drawn = decodeTotal = ageTotal = 0; intervalStart = now;
   }, 1000);
   devices.addEventListener('change', () => { if (devices.value) send({ type: 'selectDevice', serial: devices.value }); });
@@ -142,6 +175,26 @@
   window.addEventListener('blur', () => { releaseAll(); cancelWheel(); });
   document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseAll(); cancelWheel(); } else viewport(); });
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+  async function benchmark(durationMs) {
+    releaseAll(); cancelWheel();
+    const generation = epoch, width = nativeWidth, height = nativeHeight;
+    const started = performance.now();
+    let direction = 1;
+    try {
+      while (epoch === generation && performance.now() - started < durationMs) {
+        const from = height * (direction > 0 ? .78 : .22), to = height * (direction > 0 ? .22 : .78);
+        pointer('down', 0, { x: width / 2, y: from });
+        const segment = performance.now();
+        let y = from;
+        while (epoch === generation && performance.now() - segment < 1000) {
+          await new Promise(requestAnimationFrame);
+          y = from + (to - from) * Math.min(1, (performance.now() - segment) / 1000);
+          pointer('move', 0, { x: width / 2, y });
+        }
+        pointer('up', 0, { x: width / 2, y }); direction *= -1;
+      }
+    } finally { send({ type: 'benchmarkDone' }); }
+  }
   canvas.addEventListener('wheel', async event => {
     event.preventDefault();
     if (!nativeWidth || wheel || pointers.size || (!event.deltaY && !event.deltaX)) return;
@@ -164,5 +217,5 @@
       }
     } finally { if (generation === wheelGeneration) { pointer('up', 0, p); wheel = false; wheelPoint = undefined; } }
   }, { passive: false });
-  send({ type: 'ready' }); viewport();
+  send({ type: 'ready', origin: window.location.origin }); viewport();
 })();

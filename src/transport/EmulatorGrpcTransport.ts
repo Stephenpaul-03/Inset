@@ -33,6 +33,7 @@ export class EmulatorGrpcTransport implements DeviceTransport {
   private syncing = false;
   private failed = false;
   private checking = false;
+  private mode: 'smooth' | 'png' = 'smooth';
   private activeTouches = new Map<number, TouchPoint>();
   private frameCallback: (frame: Frame) => void = () => {};
   private sizeCallback: (w: number, h: number) => void = () => {};
@@ -80,7 +81,7 @@ export class EmulatorGrpcTransport implements DeviceTransport {
     this.syncing = true;
     try {
       // Only request a full frame at attachment or when display geometry changes.
-      const image = await this.call<Image>('getScreenshot', { format: 'PNG' });
+      const image = await this.call<Image>('getScreenshot', { format: 'RGBA8888' });
       if (generation !== this.generation) return;
       const { width, height } = image.format;
       // Resizable AVDs briefly return empty frames while switching modes.
@@ -118,24 +119,34 @@ export class EmulatorGrpcTransport implements DeviceTransport {
 
   setViewport(width: number, height: number, dpr: number, lowBandwidth: boolean): void {
     const previous = this.requestedSize();
+    const previousFormat = this.format;
     this.viewport = { width, height, dpr, low: lowBandwidth };
     const next = this.requestedSize();
-    if (this.stream && (previous.width !== next.width || previous.height !== next.height)) this.openStream();
+    if (this.stream && (previous.width !== next.width || previous.height !== next.height || previousFormat !== this.format)) this.openStream();
   }
+  setMode(mode: 'smooth' | 'png'): void {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    if (this.stream) this.openStream();
+  }
+  private get format(): 'RGBA8888' | 'PNG' { return this.mode === 'smooth' && !this.viewport.low ? 'RGBA8888' : 'PNG'; }
   private requestedSize() {
-    return requestSize(this.native.width || 1080, this.native.height || 2400, this.viewport.width, this.viewport.height, this.viewport.dpr, this.viewport.low);
+    return requestSize(this.native.width || 1080, this.native.height || 2400, this.viewport.width, this.viewport.height, this.viewport.dpr, this.viewport.low,
+      this.format === 'RGBA8888' ? 600000 : 400000);
   }
   private openStream(): void {
     if (!this.client || !this.native.width || this.failed) return;
     const streamGeneration = ++this.streamGeneration;
     this.stream?.cancel();
     const generation = this.generation;
-    const stream = this.client.streamScreenshot({ format: 'PNG', ...this.requestedSize() }, this.metadata) as grpc.ClientReadableStream<Image>;
+    const format = this.format;
+    const stream = this.client.streamScreenshot({ format, ...this.requestedSize() }, this.metadata) as grpc.ClientReadableStream<Image>;
     this.stream = stream;
     stream.on('data', (image: Image) => {
       if (generation !== this.generation || streamGeneration !== this.streamGeneration || this.syncing) return;
       const { width, height } = image.format;
       if (!image.image.length || !width || !height) return;
+      if (format === 'RGBA8888' && image.image.length !== width * height * 4) { this.fail({ code: grpc.status.DATA_LOSS }); return; }
       const ratioChanged = Math.abs(width / height - this.native.width / this.native.height) > 0.01;
       if (this.imageSignature(image) !== this.signature || ratioChanged) {
         void this.syncNative(generation).then(() => { if (generation === this.generation) this.openStream(); })
@@ -143,7 +154,7 @@ export class EmulatorGrpcTransport implements DeviceTransport {
         return;
       }
       this.frameCallback({ width, height, nativeWidth: this.native.width, nativeHeight: this.native.height,
-        data: image.image, format: 'png', arrivedAt: Date.now() });
+        data: image.image, format: format === 'RGBA8888' ? 'rgba' : 'png', arrivedAt: Date.now() });
     });
     stream.on('error', (error: grpc.ServiceError) => {
       if (generation === this.generation && streamGeneration === this.streamGeneration && error.code !== grpc.status.CANCELLED) this.fail(error);

@@ -2,7 +2,7 @@ import type { EmulatorTarget } from '../discovery/running';
 export interface Frame {
   width: number; height: number;
   nativeWidth: number; nativeHeight: number;
-  data: Uint8Array; format: 'png'; arrivedAt: number;
+  data: Uint8Array; format: 'png' | 'rgba'; arrivedAt: number;
 }
 export interface TouchPoint { x: number; y: number; id: number; down: boolean }
 export interface StreamSize { width: number; height: number }
@@ -12,6 +12,7 @@ export interface DeviceTransport {
   onSizeChange(cb: (w: number, h: number) => void): void;
   onError(cb: (error: Error) => void): void;
   setViewport(width: number, height: number, dpr: number, lowBandwidth: boolean): void;
+  setMode(mode: 'smooth' | 'png'): void;
   touch(points: TouchPoint[]): Promise<void>;
   stop(): void;
 }

@@ -1,5 +1,15 @@
 # VS Code Android Emulator Panel: v1 handoff
 
+## Performance update — v0.1.1, 5 November 2026
+
+The installed v0.1.0 reproduced low FPS at 738×1640. Direct profiling showed a PNG capture/encoding bottleneck in the current emulator session. v0.1.1 defaults to raw RGBA over a loopback WebSocket, with a 0.6-megapixel resolution cap, input on the same channel, and a bounded three-frame window. PNG remains an optional bandwidth-saving mode. A full-resolution-cap VS Code test measured approximately 60 FPS through webview-originated dragging, retaining every sample after a fixed warmup. See VALIDATION.md. The original PNG decision below is historical and superseded by this measurement.
+
+### Resume checkpoint
+
+- v0.1.1 is packaged at `artifacts/portal-emulator-0.1.1.vsix` and installed in the owner's normal VS Code profile. Activation required **Developer: Reload Window**; performance in that workspace has not yet been confirmed.
+- Next: verify that the HUD shows `rgba · local` after activation and measure actual dragging in the normal workspace. Check image sharpness against the 0.6-megapixel cap before adjusting quality settings.
+- Passed before this checkpoint: core tests, local-channel capability/Origin checks, browser rendering/input checks, live rotation/resizing, full-cap webview-originated dragging (60.002 FPS mean), reconnect/auth recovery, and unpacked VSIX raw-channel smoke validation.
+
 ## Implementation update — 5 November 2026
 
 The extension is implemented in `src/` and `media/`. See `README.md` for installation/development and `VALIDATION.md` for measured results and remaining manual checks. The original handoff below is retained as the design and spike record; its "NOT yet verified" list describes the pre-implementation state.
@@ -7,7 +17,7 @@ The extension is implemented in `src/` and `media/`. See `README.md` for install
 - Built: sidebar canvas, adaptive PNG/ArrayBuffer streaming, bounded frame delivery, performance HUD, device picker, pointer/wheel input, navigation/rotate/refresh, path settings, reconnect, and hidden-view pause/resume.
 - Verified on the owner's Mac: real VS Code rendering at approximately 59–60 FPS during steady scrolling, rotation, Resizable AVD phone/foldable/tablet modes, transport reconnect, and hide/resume. Simulated restart tests cover changed ports/tokens and authentication recovery.
 - Remaining: actual process restart and sleep/wake, second real emulator/device switching, Linux/Windows, and extended daily use. Multi-touch RPCs are accepted; pinch behavior remains unverified.
-- Local VSIX: `artifacts/portal-emulator-0.1.0.vsix`. This is a private development build, not a Marketplace release. Working name: Portal Emulator.
+- Local VSIX: `artifacts/portal-emulator-0.1.1.vsix`. This is a private development build, not a Marketplace release. Working name: Portal Emulator.
 - Repository cleanup: original spike scripts, the minimal protocol, raw benchmark JSON, and captured emulator screenshots have been removed. Their findings remain below; current validation scripts are in `scripts/` and use a neutral test fixture. Build output and local artifacts are ignored by Git.
 
 ---

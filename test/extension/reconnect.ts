@@ -12,6 +12,7 @@ export async function verifyReconnect(extensionPath: string, waitFor: (predicate
   const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'portal-restart-'));
   const definition = grpc.loadPackageDefinition(protoLoader.loadSync(path.join(extensionPath, 'proto/emulator_controller.proto'), { enums: String, longs: String, defaults: true })) as any;
   const image = await fs.readFile(path.join(extensionPath, 'test/fixtures/screen.png'));
+  const rawImage = Buffer.alloc(540 * 1200 * 4, 255);
   const servers: grpc.Server[] = [];
   const streams = new Set<grpc.ServerWritableStream<any, any>>();
   async function server(token: string): Promise<number> {
@@ -26,7 +27,7 @@ export async function verifyReconnect(extensionPath: string, waitFor: (predicate
       getDisplayConfigurations: (call: any, cb: any) => authorize(call, cb, { displays: [{ display: 0, width: 1080, height: 2400 }] }),
       streamScreenshot: (call: grpc.ServerWritableStream<any, any>) => {
         streams.add(call);
-        const frame = () => call.write({ format: { format: 'PNG', width: 540, height: 1200 }, image });
+        const frame = () => call.write({ format: { format: call.request.format, width: 540, height: 1200 }, image: call.request.format === 'RGBA8888' ? rawImage : image });
         frame(); const timer = setInterval(frame, 200);
         call.on('cancelled', () => { clearInterval(timer); streams.delete(call); });
       },
