@@ -3,6 +3,7 @@ import * as protoLoader from '@grpc/proto-loader';
 import type { EmulatorTarget } from '../discovery/running';
 import type { DeviceTransport, Frame, TouchPoint } from './DeviceTransport';
 import { requestSize, clampCoordinate } from './geometry';
+import { keyRequest, type KeyInput } from './keyboard';
 
 interface Image {
   image: Buffer;
@@ -35,6 +36,9 @@ export class EmulatorGrpcTransport implements DeviceTransport {
   private checking = false;
   private mode: 'smooth' | 'png' = 'smooth';
   private activeTouches = new Map<number, TouchPoint>();
+  private activeKeys = new Set<string>();
+  private keyboardGeneration = 0;
+  private nextKeyAt = 0;
   private frameCallback: (frame: Frame) => void = () => {};
   private sizeCallback: (w: number, h: number) => void = () => {};
   private errorCallback: (error: Error) => void = () => {};
@@ -188,7 +192,47 @@ export class EmulatorGrpcTransport implements DeviceTransport {
     const points = [...this.activeTouches.values()].map(point => ({ ...point, down: false }));
     if (points.length) await this.touch(points);
   }
+  async key(input: KeyInput): Promise<void> {
+    const generation = this.keyboardGeneration;
+    // RPC completion means scheduled, not consumed by Android. Space modifier
+    // transitions so rapid Ctrl+A/C/V doesn't overtake the guest's key state.
+    const wait = this.nextKeyAt - Date.now();
+    if (wait > 0) await new Promise(resolve => setTimeout(resolve, wait));
+    if (generation !== this.keyboardGeneration || !this.client) return;
+    if (input.action === 'down') this.activeKeys.add(input.key);
+    else if (input.action === 'up') this.activeKeys.delete(input.key);
+    // USB encoding honors eventType on emulator builds where raw Evdev and
+    // named non-printable keys otherwise arrive as key-up events only.
+    await this.call('sendKey', keyRequest(input, this.activeKeys.has('Control') || this.activeKeys.has('Alt')));
+    this.nextKeyAt = Date.now() + 16;
+  }
+  async text(text: string): Promise<void> {
+    // The emulator's key translator only covers printable ASCII reliably.
+    // Clipboard insertion supports committed IME/non-Latin text as well.
+    if (/[^\x20-\x7e\r\n\t]/.test(text) || text.length > 128) { await this.paste(text); return; }
+    const generation = this.keyboardGeneration;
+    for (const key of text) {
+      if (generation !== this.keyboardGeneration) return;
+      await this.key({ key: key === '\n' || key === '\r' ? 'Enter' : key === '\t' ? 'Tab' : key, action: 'press' });
+    }
+  }
+  async paste(text: string): Promise<void> {
+    await this.releaseKeys();
+    const generation = this.keyboardGeneration;
+    await this.call('setClipboard', { text });
+    await new Promise(resolve => setTimeout(resolve, 50));
+    if (generation !== this.keyboardGeneration) return;
+    await this.key({ key: 'Control', action: 'down' });
+    try {
+      if (generation === this.keyboardGeneration) await this.key({ key: 'v', action: 'press' });
+    } finally { await this.key({ key: 'Control', action: 'up' }); }
+  }
+  async releaseKeys(): Promise<void> {
+    ++this.keyboardGeneration;
+    for (const key of [...this.activeKeys]) await this.key({ key, action: 'up' });
+  }
   stop(): void {
+    ++this.keyboardGeneration; this.nextKeyAt = 0;
     ++this.generation;
     ++this.streamGeneration;
     clearInterval(this.poll);
@@ -196,13 +240,17 @@ export class EmulatorGrpcTransport implements DeviceTransport {
     this.stream?.cancel(); this.stream = undefined;
     const client = this.client;
     this.client = undefined;
-    if (client && this.activeTouches.size) {
+    if (client && (this.activeTouches.size || this.activeKeys.size)) {
       // Release pressed fingers even if the sidebar is hidden mid-drag.
       const timer = setTimeout(() => client.close(), 300);
-      client.sendTouch({ touches: [...this.activeTouches.values()].map(p => ({ x: Math.round(p.x), y: Math.round(p.y), identifier: p.id, pressure: 0 })) }, this.metadata,
-        { deadline: Date.now() + 250 }, () => { clearTimeout(timer); client.close(); });
+      const releases: Promise<void>[] = [];
+      const release = (method: string, message: unknown) => new Promise<void>(resolve => client[method](message, this.metadata, { deadline: Date.now() + 250 }, () => resolve()));
+      if (this.activeTouches.size) releases.push(release('sendTouch', { touches: [...this.activeTouches.values()].map(p => ({ x: Math.round(p.x), y: Math.round(p.y), identifier: p.id, pressure: 0 })) }));
+      for (const key of this.activeKeys) releases.push(release('sendKey', keyRequest({ key, action: 'up' })));
+      void Promise.allSettled(releases).then(() => { clearTimeout(timer); client.close(); });
     } else client?.close();
     this.activeTouches.clear();
+    this.activeKeys.clear();
     this.native = { width: 0, height: 0 };
     this.signature = ''; this.displaySignature = ''; this.syncing = false; this.failed = false; this.checking = false;
   }

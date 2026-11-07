@@ -4,8 +4,11 @@
   const vscode = acquireVsCodeApi();
   let socket, socketUrl, reconnectTimer;
   const send = message => {
-    if (!active && ['pointer', 'performance'].includes(message.type)) return;
-    if (socket?.readyState === WebSocket.OPEN && ['ack', 'pointer', 'performance'].includes(message.type)) socket.send(JSON.stringify(message));
+    if ((message.type === 'paste' || message.type === 'text') && new TextEncoder().encode(JSON.stringify(message)).byteLength > 60000) {
+      showNotice('Paste a smaller block of text (under 60 KB).'); return;
+    }
+    if (!active && ['pointer', 'performance', 'keyboard', 'text', 'paste'].includes(message.type)) return;
+    if (socket?.readyState === WebSocket.OPEN && ['ack', 'pointer', 'performance', 'keyboard', 'text', 'paste', 'releaseKeys'].includes(message.type)) socket.send(JSON.stringify(message));
     else vscode.postMessage(message);
   };
   function connectChannel(url) {
@@ -25,6 +28,53 @@
     connection.onerror = () => connection.close();
   }
   const canvas = document.getElementById('screen');
+  const keyboard = document.getElementById('keyboard-input');
+  const heldModifiers = new Set();
+  let composing = false;
+  function releaseKeyboard() {
+    if (heldModifiers.size) send({ type: 'releaseKeys' });
+    heldModifiers.clear(); composing = false; keyboard.value = '';
+  }
+  function focusKeyboard() { if (active && nativeWidth) keyboard.focus({ preventScroll: true }); }
+  canvas.addEventListener('focus', focusKeyboard);
+  keyboard.addEventListener('focus', () => canvas.classList.add('keyboard-focused'));
+  keyboard.addEventListener('blur', () => { canvas.classList.remove('keyboard-focused'); releaseKeyboard(); });
+  function syncModifiers(event, command = false) {
+    const desired = new Set();
+    if (event.ctrlKey || command) desired.add('Control');
+    if (event.altKey) desired.add('Alt');
+    if (event.shiftKey) desired.add('Shift');
+    for (const key of heldModifiers) if (!desired.has(key)) { send({ type: 'keyboard', key, action: 'up' }); heldModifiers.delete(key); }
+    for (const key of desired) if (!heldModifiers.has(key)) { send({ type: 'keyboard', key, action: 'down' }); heldModifiers.add(key); }
+  }
+  const specialKeys = new Set(['Backspace', 'Delete', 'Enter', 'Tab', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', 'Insert']);
+  keyboard.addEventListener('keydown', event => {
+    if (!active || !nativeWidth || event.isComposing || composing || event.key === 'Dead' || event.key === 'Process') return;
+    const command = event.metaKey && /^[acxv]$/i.test(event.key);
+    if (event.metaKey && !command) return; // Keep VS Code/window shortcuts available.
+    if ((event.ctrlKey || command) && !event.altKey && event.key.toLowerCase() === 'v') { releaseKeyboard(); return; } // paste event carries host clipboard text.
+    if ((event.ctrlKey || command || (event.altKey && !event.getModifierState('AltGraph'))) && event.key.length === 1 || specialKeys.has(event.key) || /^F([1-9]|1[0-2])$/.test(event.key)) {
+      event.preventDefault(); syncModifiers(event, command);
+      send({ type: 'keyboard', key: event.key, action: 'press' });
+    }
+  });
+  keyboard.addEventListener('keyup', event => {
+    for (const [key, down] of [['Control', event.ctrlKey || event.metaKey], ['Shift', event.shiftKey], ['Alt', event.altKey]]) {
+      if (!down && heldModifiers.delete(key)) send({ type: 'keyboard', key, action: 'up' });
+    }
+  });
+  function commitText() {
+    if (composing || !active || !nativeWidth || !keyboard.value) return;
+    const text = keyboard.value; releaseKeyboard(); send({ type: 'text', text });
+  }
+  keyboard.addEventListener('input', event => { if (!event.isComposing) commitText(); });
+  keyboard.addEventListener('compositionstart', () => { composing = true; });
+  keyboard.addEventListener('compositionend', () => { composing = false; setTimeout(commitText, 0); });
+  keyboard.addEventListener('paste', event => {
+    if (!active || !nativeWidth) return;
+    const text = event.clipboardData?.getData('text/plain');
+    if (text) { event.preventDefault(); releaseKeyboard(); send({ type: 'paste', text }); }
+  });
   const stage = document.getElementById('stage');
   const surface = document.getElementById('surface');
   const connection = document.getElementById('connection');
@@ -45,12 +95,27 @@
   const stats = document.getElementById('stats');
   let nativeWidth = 0, nativeHeight = 0, epoch = 0, pending, decoding = false;
   let drawn = 0, decodeTotal = 0, ageTotal = 0, intervalStart = performance.now();
+  let intervalWallStart = Date.now(), reportId = 0, latestReport;
+  let lastDrawAt = 0, frameGap = 0;
   let noticeTimer, resizeTimer;
   const pointers = new Map();
   const moves = new Map();
-  let moveScheduled = false, wheel = false, wheelGeneration = 0;
+  let moveTimer, nextMoveAt = 0, wheel = false, wheelGeneration = 0;
   let wheelPoint;
   let sourceFps = 0, frameFormat = 'rgba', channelName = 'bridge';
+  let inputEvents = 0, animationTicks = 0, animationGap = 0, lastAnimation = 0, animationUntil = 0, animationRequest;
+  function watchAnimation() {
+    animationUntil = performance.now() + 1500;
+    if (animationRequest) return;
+    lastAnimation = 0;
+    const tick = now => {
+      animationTicks++;
+      if (lastAnimation) animationGap = Math.max(animationGap, now - lastAnimation);
+      lastAnimation = now;
+      animationRequest = now < animationUntil && active ? requestAnimationFrame(tick) : undefined;
+    };
+    animationRequest = requestAnimationFrame(tick);
+  }
 
   function enabled(value) { document.querySelectorAll('[data-device-action]').forEach(button => { button.disabled = !value || !active; }); }
   enabled(false);
@@ -100,7 +165,10 @@
           }
           fitCanvas();
           canvas.classList.add('live'); empty.hidden = true; enabled(true);
-          drawn++; decodeTotal += performance.now() - started; ageTotal += Math.max(0, Date.now() - frame.arrivedAt);
+          const finished = performance.now();
+          if (lastDrawAt) frameGap = Math.max(frameGap, finished - lastDrawAt);
+          lastDrawAt = finished;
+          drawn++; decodeTotal += finished - started; ageTotal += Math.max(0, Date.now() - frame.arrivedAt);
         }
         bitmap?.close();
       } catch { showNotice('Could not decode a frame. Refresh the connection.'); }
@@ -141,6 +209,7 @@
     } else if (message.type === 'notice') showNotice(message.message);
     else if (message.type === 'config') {
       if (message.active === false && active) {
+        releaseKeyboard(); keyboard.blur();
         releaseAll(); cancelWheel(); ++epoch;
         if (pending) send({ type: 'ack', id: pending.id });
         pending = undefined; nativeWidth = nativeHeight = 0;
@@ -158,26 +227,39 @@
       setDetails(preferences.details ?? message.showStats ?? false);
       connectChannel(message.frameChannel); viewport();
     }
-    else if (message.type === 'pipeline') { sourceFps = message.sourceFps; frameFormat = message.format; channelName = message.channel; }
+    else if (message.type === 'pipeline' && latestReport && message.reportId === latestReport.reportId) {
+      sourceFps = message.sourceFps; frameFormat = message.format; channelName = message.channel;
+      showPerformance(latestReport, sourceFps);
+    }
     else if (message.type === 'benchmark') { void benchmark(message.durationMs); }
     else if (message.type === 'reset') {
+      releaseKeyboard(); keyboard.blur();
       releaseAll(); cancelWheel(); ++epoch;
       if (pending) send({ type: 'ack', id: pending.id });
       pending = undefined; nativeWidth = nativeHeight = 0;
       canvas.classList.remove('live'); empty.hidden = false; enabled(false);
       surface.style.width = surface.style.height = ''; fps.textContent = 'Idle';
       drawn = decodeTotal = ageTotal = 0; intervalStart = performance.now();
+      intervalWallStart = Date.now(); latestReport = undefined; lastDrawAt = frameGap = 0;
     }
   });
+  function showPerformance(report, source) {
+    stats.textContent = report.fps ? `${report.fps.toFixed(0)} fps · source ${source === undefined ? '…' : source.toFixed(0)} · input ${report.inputFps.toFixed(0)} · browser ${report.rafFps.toFixed(0)} · ${frameFormat} · ${channelName} · draw ${report.decodeMs.toFixed(1)} ms · age ${report.ageMs.toFixed(0)} ms · gap ${report.frameMaxGapMs.toFixed(0)} ms · ${report.width}×${report.height}` : 'Idle · frames arrive when the screen changes';
+  }
   setInterval(() => {
     if (!active) return;
     const now = performance.now();
     fps.textContent = drawn ? `${Math.round(drawn * 1000 / (now - intervalStart))} FPS` : 'Idle';
-    send({ type: 'performance', fps: drawn * 1000 / (now - intervalStart), decodeMs: drawn ? decodeTotal / drawn : 0,
+    const wallEnd = Date.now();
+    latestReport = { type: 'performance', reportId: ++reportId, windowStart: intervalWallStart, windowEnd: wallEnd,
+      fps: drawn * 1000 / (now - intervalStart), decodeMs: drawn ? decodeTotal / drawn : 0,
       ageMs: drawn ? ageTotal / drawn : 0, width: canvas.width, height: canvas.height,
-      documentHidden: document.hidden ? 1 : 0 });
-    stats.textContent = drawn ? `${(drawn * 1000 / (now - intervalStart)).toFixed(0)} fps · source ${sourceFps} · ${frameFormat} · ${channelName} · draw ${(decodeTotal / drawn).toFixed(1)} ms · age ${(ageTotal / drawn).toFixed(0)} ms · ${canvas.width}×${canvas.height}` : 'Idle · frames arrive when the screen changes';
+      documentHidden: document.hidden ? 1 : 0, inputFps: inputEvents * 1000 / (now - intervalStart),
+      rafFps: animationTicks * 1000 / (now - intervalStart), rafMaxGapMs: animationGap, frameMaxGapMs: frameGap };
+    send(latestReport); showPerformance(latestReport);
     drawn = decodeTotal = ageTotal = 0; intervalStart = now;
+    intervalWallStart = wallEnd; lastDrawAt = frameGap = 0;
+    inputEvents = animationTicks = animationGap = 0;
   }, 1000);
   devices.addEventListener('change', () => { if (devices.value) send({ type: 'selectDevice', serial: devices.value }); });
   document.querySelectorAll('[data-button]').forEach(button => button.addEventListener('click', () => {
@@ -205,10 +287,11 @@
     return { x: Math.max(0, Math.min(nativeWidth - 1, Math.round((event.clientX - r.left) / r.width * nativeWidth))),
       y: Math.max(0, Math.min(nativeHeight - 1, Math.round((event.clientY - r.top) / r.height * nativeHeight))) };
   }
-  function pointer(action, id, p) { send({ type: 'pointer', action, id, ...p }); }
+  function pointer(action, id, p) { inputEvents++; watchAnimation(); send({ type: 'pointer', action, id, ...p }); }
   function flushMoves() {
+    clearTimeout(moveTimer); moveTimer = undefined;
     for (const [id, p] of moves) pointer('move', id, p);
-    moves.clear(); moveScheduled = false;
+    moves.clear(); nextMoveAt = performance.now() + 1000 / 120;
   }
   canvas.addEventListener('pointerdown', event => {
     if (!active || !nativeWidth || event.button !== 0 || wheel) return;
@@ -218,11 +301,15 @@
     event.preventDefault(); canvas.focus(); canvas.setPointerCapture(event.pointerId);
     const p = point(event); pointers.set(event.pointerId, { id, ...p }); pointer('down', id, p);
   });
-  canvas.addEventListener('pointermove', event => {
+  function movePointer(event) {
     const previous = pointers.get(event.pointerId); if (!previous) return;
     const p = point(event); pointers.set(event.pointerId, { id: previous.id, ...p }); moves.set(previous.id, p);
-    if (!moveScheduled) { moveScheduled = true; requestAnimationFrame(flushMoves); }
-  });
+    // Input must not wait for a VS Code compositor/rAF tick. Raw pointer events
+    // preserve device cadence when Chromium coalesces pointermove to rendering.
+    if (!moveTimer) moveTimer = setTimeout(flushMoves, Math.max(0, nextMoveAt - performance.now()));
+  }
+  canvas.addEventListener('pointermove', movePointer);
+  canvas.addEventListener('pointerrawupdate', movePointer);
   function release(event) {
     const p = pointers.get(event.pointerId); if (!p) return;
     flushMoves(); pointer('up', p.id, p); pointers.delete(event.pointerId);
@@ -236,8 +323,8 @@
     if (wheel && wheelPoint) pointer('up', 0, wheelPoint);
     wheelPoint = undefined; wheel = false;
   }
-  window.addEventListener('blur', () => { releaseAll(); cancelWheel(); });
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseAll(); cancelWheel(); } else viewport(); });
+  window.addEventListener('blur', () => { releaseAll(); cancelWheel(); releaseKeyboard(); });
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { releaseAll(); cancelWheel(); releaseKeyboard(); } else viewport(); });
   const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
   async function benchmark(durationMs) {
     releaseAll(); cancelWheel(); canvas.focus();
@@ -250,8 +337,11 @@
         pointer('down', 0, { x: width / 2, y: from });
         const segment = performance.now();
         let y = from;
+        let tick = 0;
         while (epoch === generation && performance.now() - segment < 1000) {
-          await new Promise(requestAnimationFrame);
+          // Use the input clock, not compositor refresh, just like real raw
+          // pointer delivery. Diagnostics separately measure browser rAF rate.
+          await delay(Math.max(0, segment + ++tick * 1000 / 120 - performance.now()));
           y = from + (to - from) * Math.min(1, (performance.now() - segment) / 1000);
           pointer('move', 0, { x: width / 2, y });
         }

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.2.1
+
+- Add hardware keyboard forwarding when the emulator screen is focused, including editing/navigation keys, modifier chords, composition, and plain-text paste.
+- Use USB key encoding and paced modifier transitions, validated against a real Android text field; cancel queued typing and release held keys on focus/presentation changes.
+- Send drag moves independently of compositor animation callbacks, accept raw pointer updates, and bound move delivery to 120 Hz.
+- Add source/input/browser timing diagnostics and regression coverage for delayed compositor callbacks, focus, composition, paste and live Android keyboard input.
+- Match source FPS to the displayed reporting interval and show the longest observed frame gap, avoiding comparisons with the previous second's source count.
+
 ## 0.2.0
 
 - Add a React Native component inspector in a reusable VS Code editor tab, with an Inspect action in the emulator toolbar.

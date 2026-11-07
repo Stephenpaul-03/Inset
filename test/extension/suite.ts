@@ -18,6 +18,25 @@ export async function run(): Promise<void> {
   assert.ok(extension); await extension.activate();
   await vscode.commands.executeCommand('portal.open');
   const initial = await waitFor(d => d.status.state === 'connected' && d.performance?.width > 0);
+  if (process.env.PORTAL_PERFORMANCE_ONLY === '1') {
+    const adb = new Adb(() => ({}));
+    const reports: any[] = [];
+    try {
+      await adb.run(['-s', initial.selected, 'shell', 'am', 'start', '-a', 'android.settings.SETTINGS']);
+      await sleep(1000);
+      for (const mode of ['sidebar', 'editor']) {
+        await vscode.commands.executeCommand(mode === 'editor' ? 'portal.openEditor' : 'portal.openSidebar');
+        await waitFor(d => d.presentation === mode && d.performance?.width > 0 && d.pipeline.channel === 'local');
+        const report: any = await vscode.commands.executeCommand('portal.benchmark', true);
+        reports.push({ mode, ...report });
+        console.log(mode, JSON.stringify(report.samples.map((d: any) => ({ fps: Math.round(d.performance.fps), source: d.pipeline.sourceFps, input: Math.round(d.performance.inputFps), raf: Math.round(d.performance.rafFps), gap: Math.round(d.performance.rafMaxGapMs), draw: d.performance.decodeMs, hidden: d.performance.documentHidden }))));
+      }
+    } finally {
+      await fs.writeFile(path.join(__dirname, '../../../artifacts/drag-investigation.json'), JSON.stringify(reports, null, 2));
+      await adb.key(initial.selected, 'back');
+    }
+    return;
+  }
   if (process.env.PORTAL_INSPECTOR_SMOKE === '1') { await verifyInspector(); return; }
   const emulatorTabs = () => vscode.window.tabGroups.all.flatMap(group => group.tabs)
     .filter(tab => tab.input instanceof vscode.TabInputWebview && tab.input.viewType.includes('portal.editor'));

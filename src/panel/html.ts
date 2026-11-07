@@ -32,9 +32,9 @@ export function webviewHtml(options: HtmlOptions): string {
         <div id="menu" class="menu" hidden><button id="toggle-details" aria-pressed="false">Performance details</button><button data-button="settings">Settings</button></div>
       </div></header>
     <div id="status" role="status">Start an emulator in Android Studio.</div><div id="notice" role="alert" hidden></div>
-    <main id="stage" aria-label="Emulator display"><div id="surface"><canvas id="screen" tabindex="0" aria-label="Android emulator screen. Use pointer to tap or drag, wheel to scroll."></canvas>
+    <main id="stage" aria-label="Emulator display"><div id="surface"><canvas id="screen" tabindex="0" aria-label="Android emulator screen. Click to focus, then type. Use pointer to tap or drag, wheel to scroll."></canvas>
       <div id="empty"><p id="empty-message">Start an emulator in Android Studio to connect.</p><button id="move-here" data-button="${editor ? 'openEditor' : 'openSidebar'}" hidden>${editor ? 'Open in Editor' : 'Move to Sidebar'}</button></div>
-    </div></main>
+    </div></main><textarea id="keyboard-input" class="keyboard-input" tabindex="-1" aria-label="Android hardware keyboard input" autocomplete="off" autocapitalize="off" spellcheck="false"></textarea>
     <div class="bottom-bar"><div class="scale-controls" ${editor ? '' : 'hidden'}><select id="zoom" aria-label="Zoom" title="Display scale"><option value="fit">Fit</option><option value="0.5">50%</option><option value="1">100%</option><option value="1.5">150%</option><option value="2">200%</option></select></div>
       <nav aria-label="Emulator controls">${button('back', 'Back', 'back', true)}${button('home', 'Home', 'home', true)}${button('recents', 'Recent apps', 'recents', true)}</nav>
       <button id="fps" class="fps" aria-label="Show performance details" aria-expanded="false" aria-controls="stats" title="Performance details">Idle</button>

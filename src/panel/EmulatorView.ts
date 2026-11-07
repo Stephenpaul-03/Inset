@@ -6,6 +6,7 @@ import type { Frame, TouchPoint } from '../transport/DeviceTransport';
 import { LatestFrameQueue } from './LatestFrameQueue';
 import { FrameChannel } from './FrameChannel';
 import { webviewHtml } from './html';
+import { keyboardMessage } from '../transport/keyboard';
 
 type Presentation = 'sidebar' | 'editor';
 interface Surface {
@@ -20,6 +21,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
   private editor?: Surface;
   private preferred: Presentation = 'sidebar';
   private inputGeneration = 0;
+  private keyboardInputGeneration = 0;
   private disposed = false;
   private scanning = false;
   private rescan = false;
@@ -105,7 +107,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     const surface: Surface = { host, kind, ready: false, dead: false, listeners: [], viewport: { width: 350, height: 900, dpr: 2 } };
     host.webview.options = { enableScripts: true, localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')] };
     const channel = new FrameChannel(message => {
-      if (surface === this.current && ['ack', 'pointer', 'performance', 'benchmarkDone'].includes((message as any)?.type))
+      if (surface === this.current && ['ack', 'pointer', 'performance', 'benchmarkDone', 'keyboard', 'text', 'paste', 'releaseKeys'].includes((message as any)?.type))
         void this.receive(message).catch(error => this.report(error));
     }, () => {
       if (surface !== this.current) return;
@@ -154,10 +156,12 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (!next) { this.disconnect(); this.adb.stop(); return; }
     if (next !== this.current) {
       ++this.inputGeneration;
+      ++this.keyboardInputGeneration;
       if (this.measurement) {
         clearTimeout(this.measurement.timer); this.measurement.reject(new Error('Performance measurement interrupted by moving the view.')); this.measurement = undefined;
       }
       void this.transport?.releaseTouches().catch(() => {});
+      void this.transport?.releaseKeys().catch(() => {});
       this.queue.reset(); clearTimeout(this.ackTimer); this.performance = undefined;
       this.current = next; this.viewport = next.viewport;
     }
@@ -257,7 +261,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (this.measurement) {
       clearTimeout(this.measurement.timer); this.measurement.reject(new Error('Performance measurement interrupted by a connection change.')); this.measurement = undefined;
     }
-    ++this.generation; ++this.inputGeneration;
+    ++this.generation; ++this.inputGeneration; ++this.keyboardInputGeneration;
     clearTimeout(this.ackTimer);
     this.queue.reset(); this.lastFrame = undefined;
     this.performance = undefined;
@@ -285,8 +289,13 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (message.type === 'performance') {
       if (['fps', 'decodeMs', 'ageMs', 'width', 'height'].every(k => Number.isFinite(message[k]) && message[k] >= 0)) {
         this.performance = Object.fromEntries(['fps', 'decodeMs', 'ageMs', 'width', 'height'].map(k => [k, message[k]]));
-        for (const key of ['rafFps', 'documentHidden']) if (Number.isFinite(message[key])) this.performance[key] = message[key];
-        this.post({ type: 'pipeline', sourceFps: this.received.filter(t => t >= Date.now() - 1000).length,
+        for (const key of ['rafFps', 'rafMaxGapMs', 'frameMaxGapMs', 'inputFps', 'documentHidden']) if (Number.isFinite(message[key])) this.performance[key] = message[key];
+        const aligned = Number.isFinite(message.windowStart) && Number.isFinite(message.windowEnd) &&
+          message.windowEnd > message.windowStart && message.windowEnd - message.windowStart <= 10000 &&
+          Math.abs(Date.now() - message.windowEnd) <= 1000;
+        const sourceFps = aligned ? this.received.filter(t => t >= message.windowStart && t < message.windowEnd).length *
+          1000 / (message.windowEnd - message.windowStart) : this.received.filter(t => t >= Date.now() - 1000).length;
+        this.post({ type: 'pipeline', reportId: message.reportId, sourceFps,
           channel: this.channel?.connected ? 'local' : 'bridge', format: this.lastFrame?.format || 'rgba' });
         if (this.measurement && Date.now() - this.measurement.started >= 2000) this.measurement.samples.push(this.diagnostics());
       }
@@ -315,6 +324,24 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
       ++this.inputCount;
       this.inputTail = this.inputTail.then(async () => {
         if (generation === this.inputGeneration) await transport.touch([point]);
+      }).catch(error => { if (generation === this.inputGeneration) this.report(error); }).finally(() => { --this.inputCount; });
+    } else if (['keyboard', 'text', 'paste', 'releaseKeys'].includes(message.type)) {
+      const input = keyboardMessage(message), transport = this.transport, generation = this.inputGeneration;
+      if (!input || !transport) return;
+      if (input.type === 'releaseKeys') {
+        ++this.keyboardInputGeneration;
+        await transport.releaseKeys(); return;
+      }
+      const keyboardGeneration = this.keyboardInputGeneration;
+      if (this.inputCount > 128 && !(input.type === 'keyboard' && input.action === 'up')) {
+        this.report(new Error('Keyboard input is arriving too quickly. Try pasting a smaller block.')); return;
+      }
+      ++this.inputCount;
+      this.inputTail = this.inputTail.then(async () => {
+        if (generation !== this.inputGeneration || keyboardGeneration !== this.keyboardInputGeneration) return;
+        if (input.type === 'keyboard') await transport.key(input);
+        else if (input.type === 'paste') await transport.paste(input.text);
+        else await transport.text(input.text);
       }).catch(error => { if (generation === this.inputGeneration) this.report(error); }).finally(() => { --this.inputCount; });
     } else if (message.type === 'button') {
       if (message.name === 'inspect') { await this.openInspector?.(); return; }

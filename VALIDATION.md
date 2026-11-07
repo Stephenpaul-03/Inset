@@ -1,6 +1,15 @@
-# Validation — 5 November 2026
+# Validation — updated 6 November 2026
 
 Environment: macOS arm64, Android Emulator 36.5.11, Resizable AVD, VS Code 1.144.1.
+
+## Keyboard and drag follow-up — v0.2.1
+
+- Nine core/protocol tests and TypeScript/bundling checks pass. Production webview checks cover focused typing, modifiers, composition committed once, paste, release on blur, and toolbar typing isolation. A delayed-rAF test verifies move delivery does not depend on compositor callbacks.
+- Real Android Settings search passed synthetic typing, USB Ctrl+A/C with clipboard readback, Unicode paste, arrow navigation and Backspace. The test clears its query and restores the prior app/clipboard. The owner separately confirmed hardware keyboard input works after installing v0.2.1.
+- Direct-source eight-second scrolling produced per-second frame counts `[59, 60, 45, 55, 59, 59, 60, 59]`; touch RPC time p50 0.445 ms, p95 1.563 ms, max 45.79 ms. This demonstrates intermittent upstream dips even without VS Code drawing, but does not isolate their cause.
+- An isolated VS Code run measured approximately 60 FPS in all eight post-warmup samples in both sidebar and editor, with source 60, input approximately 122/s, browser approximately 120/s and draw approximately 0.1 ms. Report: `artifacts/drag-investigation.json`. This synthetic benchmark does not reproduce every physical pointer/device cadence or normal-workspace load.
+- Owner's normal-workspace report before the drag fix: 27 FPS, source 24, raw/local, draw 0.1 ms, age 1 ms. After v0.2.1, their screenshot shows 59 FPS, browser 126/s, draw 0.1 ms and age 1 ms, with intermittent dips still reported. Its source 42 label was from the previous reporting interval; the follow-up matches source and displayed windows and adds the maximum observed gap between drawn frames within each sample. Frame gaps can include pauses or static content and are not automatically dropped frames.
+- The owner clarified that the observed dips happen at swipe starts/ends or pauses, consistent with change-driven frame delivery and one-second averaging. No steady-motion dips have been reported after this update. Sustained normal-workspace 60 FPS remains unproven by a screenshot; investigate further if actual stutters or steady-motion dips occur. Do not discard low benchmark samples. No React Native inspector-connected performance rerun was performed in this follow-up; Metro was not running.
 
 ## Passed
 

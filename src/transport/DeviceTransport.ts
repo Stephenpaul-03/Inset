@@ -1,4 +1,5 @@
 import type { EmulatorTarget } from '../discovery/running';
+import type { KeyInput } from './keyboard';
 export interface Frame {
   width: number; height: number;
   nativeWidth: number; nativeHeight: number;
@@ -15,5 +16,9 @@ export interface DeviceTransport {
   setMode(mode: 'smooth' | 'png'): void;
   touch(points: TouchPoint[]): Promise<void>;
   releaseTouches(): Promise<void>;
+  key(input: KeyInput): Promise<void>;
+  text(text: string): Promise<void>;
+  paste(text: string): Promise<void>;
+  releaseKeys(): Promise<void>;
   stop(): void;
 }

@@ -28,6 +28,8 @@ select:hover { border-color: var(--vscode-dropdown-border, #555); }
 #surface { min-width: 100%; min-height: 100%; display: grid; place-items: center; }
 canvas { display: none; flex-shrink: 0; touch-action: none; user-select: none; background: #000; }
 canvas.live { display: block; }
+.keyboard-input { position: fixed; top: 0; left: 0; width: 1px; height: 1px; padding: 0; border: 0; opacity: 0; pointer-events: none; resize: none; }
+canvas.keyboard-focused { outline: 1px solid var(--vscode-focusBorder, #499bff); outline-offset: -1px; }
 #empty { max-width: 235px; padding: 12px; text-align: center; line-height: 1.6; color: var(--vscode-descriptionForeground, #aaa); }
 #empty p { margin: 0 0 12px; }
 #move-here { color: var(--vscode-button-foreground, white); background: var(--vscode-button-background, #236a9e); padding: 5px 10px; }

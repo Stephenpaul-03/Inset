@@ -4,7 +4,7 @@ View and control an **already-running Android emulator** inside a compact VS Cod
 
 ## Install and use
 
-1. In VS Code, run **Extensions: Install from VSIX…** and select `artifacts/portal-emulator-0.2.0.vsix`.
+1. In VS Code, run **Extensions: Install from VSIX…** and select `artifacts/portal-emulator-0.2.1.vsix`.
 2. Start your Android emulator in Android Studio.
 3. Run **Portal: Open Emulator**, or click the Portal icon in the Activity Bar.
 4. Choose a running emulator. Click to tap, drag to swipe, and use the wheel or trackpad to scroll.
@@ -16,6 +16,10 @@ Use **Open in Editor** in the toolbar or **Portal: Open Emulator in Editor** fro
 Editor mode adds **Fit**, **50%**, **100%**, **150%**, and **200%** display scales. Fit preserves the entire display and its aspect ratio. At larger scales, use the display scrollbars to pan; taps and drags still map to native device coordinates. At 100%, a device pixel occupies one display pixel. Zoom changes display size, while the streaming resolution cap remains in place.
 
 Click the compact FPS indicator, or choose **More actions → Performance details**, to expand the detailed readout. Settings are also under More actions. To keep the sidebar beside your editor on the right, right-click its view title and use **Move View** to place it in the Secondary Side Bar.
+
+Click the emulator screen to focus **hardware keyboard input**, then type into the Android field. Backspace/Delete, arrows, Enter, Tab, and Shift selection are forwarded. Ctrl shortcuts and the usual macOS Cmd+A/C/X shortcuts target Android while its screen has keyboard focus; other Cmd shortcuts remain available to VS Code. Paste imports plain text from the host clipboard; committed non-ASCII input and larger text blocks use Android's clipboard. Copy/cut operate on Android's clipboard. Held modifiers are released on blur, hiding, switching presentations and disconnect. Clicking Portal's toolbar returns keyboard focus to VS Code controls.
+
+Drag input uses raw pointer updates when available and a timer capped at 120 move updates/second, independently of webview animation callbacks. Performance details show **source** (frames received from the emulator in the displayed reporting interval), **input** (pointer events sent), **browser** (animation callbacks during interaction), and **gap** (longest observed interval between drawn frames within that sample). Source briefly shows “…” while its matching host report arrives. A fast draw time with a low source rate points upstream of canvas drawing; compare input/browser rates and the same app's native behavior rather than treating every low source rate as a frame-transfer problem. Pauses and static screens reduce FPS and can increase gaps; measure during steady movement. Idle apps do not generate 60 new frames per second.
 
 Requires VS Code 1.95 or later and a recent Android Emulator advertising local gRPC. Verified on macOS with emulator 36.5.11 and VS Code 1.144.1. adb is required for navigation buttons and live device tracking. Rotation changes the emulator's physical orientation; Android applications that lock orientation may keep their layout.
 
@@ -60,12 +64,15 @@ npm run test:channel
 npm run test:webview
 npm run test:inspector
 npm run test:inspector:live
+npm run test:keyboard
 npm run test:emulator
 npm run test:extension
 npm run package
 ```
 
 Press F5 to launch the extension in a development window. Browser tests use the installed Google Chrome; extension integration tests use the installed VS Code. These two launch scripts currently use macOS application paths. Live tests require a running emulator. The emulator test temporarily changes rotation/display modes and restores them. The extension test verifies session-preserving sidebar/editor moves and single-tab reuse, opens Android Settings for drag workloads in both presentations, then presses Back afterward. It uses an isolated VS Code profile and a loopback gRPC fixture to test changed ports/tokens and authentication recovery.
+
+`test:keyboard` opens Android Settings search, validates synthetic typing/select-all/copy, Unicode paste and editing through the real emulator keyboard RPCs, clears its query and restores the prior clipboard/app. `PORTAL_PERFORMANCE_ONLY=1 npm run test:extension` records sidebar/editor dragging, source/input/browser cadence and every post-warmup sample in `artifacts/drag-investigation.json`. These checks temporarily control the emulator; avoid interacting with it during the run.
 
 `test:inspector` uses production inspector HTML/CSP with neutral component fixtures. `test:inspector:live` requires Tally's development build and Metro: it validates real component data, source mapping, a temporary Text-prop edit (restored afterward), native picking, and app reload recovery. It stores local screenshots only under ignored `artifacts/`. Set `PORTAL_INSPECTOR_SMOKE=1` when running `test:extension` for the inspector-in-VS-Code smoke test; it checks real connection, tab reuse, native selection, preservation of the emulator session, and close cleanup. Inspector protocol/session code lives in `src/inspector/`; `media/inspector.*` is its VS Code webview. The debugger socket remains in the extension host and the webview receives structured component data.
 
@@ -77,6 +84,6 @@ Git tracks source, tests, configuration, the lockfile, and documentation. Depend
 
 ## Validation and remaining limits
 
-See `VALIDATION.md` in the source folder for measured results and open checks. Linux/Windows discovery paths are implemented but unverified. An actual emulator process restart and host sleep/wake still need manual validation; port/token replacement and reconnect behavior have been tested with a protocol fixture. Multi-device switching needs a second running emulator for live validation. Physical devices, iOS, keyboard text input, recording, and Marketplace publishing are outside v1.
+See `VALIDATION.md` in the source folder for measured results and open checks. Linux/Windows discovery paths are implemented but unverified. An actual emulator process restart and host sleep/wake still need manual validation; port/token replacement and reconnect behavior have been tested with a protocol fixture. Multi-device switching needs a second running emulator for live validation. Physical devices, iOS, recording, and Marketplace publishing remain outside scope. Hardware keyboard input was added in v0.2.1.
 
 This is a private development build. Portal is a working name; name availability must be checked before publishing.

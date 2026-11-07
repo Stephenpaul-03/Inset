@@ -1,6 +1,6 @@
 {
   "name": "portal-emulator",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "View and control a running Android emulator in a compact sidebar or editor tab.",
   "main": "./dist/extension.js",
@@ -15,7 +15,8 @@
     "package": "node scripts/package.mjs",
     "test:channel": "tsc && node --test out/test/channel.integration.js",
     "test:inspector": "tsc && node scripts/test-inspector.mjs",
-    "test:inspector:live": "tsc && node scripts/test-inspector.mjs --live"
+    "test:inspector:live": "tsc && node scripts/test-inspector.mjs --live",
+    "test:keyboard": "tsc && node scripts/test-keyboard.cjs"
   },
   "dependencies": {
     "@grpc/grpc-js": "^1.12.0",
