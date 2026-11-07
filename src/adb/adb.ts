@@ -21,7 +21,7 @@ export class Adb {
     return new Promise((resolve, reject) => {
       execFile(locateAdb(this.options()), args, { timeout: 5000, maxBuffer: 1024 * 1024 }, (error, stdout) => {
         if (!error) resolve(stdout.trim());
-        else if ((error as NodeJS.ErrnoException).code === 'ENOENT') reject(new Error('adb not found. Set Portal: Adb Path or SDK Path in Settings.'));
+        else if ((error as NodeJS.ErrnoException).code === 'ENOENT') reject(new Error('adb not found. Set Inset: Adb Path or SDK Path in Settings.'));
         else reject(new Error(`adb command failed. Check that the emulator is online. ${error.message}`));
       });
     });

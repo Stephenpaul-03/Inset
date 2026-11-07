@@ -44,7 +44,7 @@ export class CdpClient extends EventEmitter {
     });
   }
   async evaluate(expression: string, returnByValue = true): Promise<any> {
-    const response = await this.request('Runtime.evaluate', { expression, returnByValue, objectGroup: 'portal-inspector', silent: true });
+    const response = await this.request('Runtime.evaluate', { expression, returnByValue, objectGroup: 'inset-inspector', silent: true });
     if (response.exceptionDetails) throw new Error(response.exceptionDetails.exception?.description || response.exceptionDetails.text || 'Runtime evaluation failed.');
     return returnByValue ? response.result?.value : response.result;
   }

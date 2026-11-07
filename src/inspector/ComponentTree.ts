@@ -54,7 +54,7 @@ export class ComponentTree {
       } else if (operation === 4 || operation === 7) { take(); take(); }
       else if (operation === 5) { take(); take(); take(); }
       else if (operation === 6) remove(rootID);
-      else throw new Error(`Unsupported React DevTools tree operation ${operation}. This React Native version needs an updated Portal adapter.`);
+      else throw new Error(`Unsupported React DevTools tree operation ${operation}. This React Native version needs an updated Inset adapter.`);
     }
     this.nodes = nodes;
   }

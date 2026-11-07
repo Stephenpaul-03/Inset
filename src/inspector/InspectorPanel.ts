@@ -19,14 +19,14 @@ export class InspectorPanel implements vscode.Disposable {
   private readonly pickingEmitter = new vscode.EventEmitter<boolean>();
   readonly onPickingChanged = this.pickingEmitter.event;
   constructor(private readonly context: vscode.ExtensionContext) {}
-  private get metro(): string { return vscode.workspace.getConfiguration('portal').get('metroUrl', 'http://127.0.0.1:8081'); }
+  private get metro(): string { return vscode.workspace.getConfiguration('inset').get('metroUrl', 'http://127.0.0.1:8081'); }
   async open(pick = false): Promise<void> {
     if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before connecting the React Native inspector.');
     const tab = vscode.window.tabGroups.activeTabGroup.activeTab?.input;
-    const emulatorEditor = tab instanceof vscode.TabInputWebview && tab.viewType.includes('portal.editor');
+    const emulatorEditor = tab instanceof vscode.TabInputWebview && tab.viewType.includes('inset.editor');
     if (this.panel) this.panel.reveal(emulatorEditor && this.panel.viewColumn === vscode.window.tabGroups.activeTabGroup.viewColumn ? vscode.ViewColumn.Beside : undefined, true);
     else {
-      const panel = this.panel = vscode.window.createWebviewPanel('portal.inspector', 'Portal: React Native Inspector', { viewColumn: emulatorEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active, preserveFocus: true }, {
+      const panel = this.panel = vscode.window.createWebviewPanel('inset.inspector', 'Inset: React Native Inspector', { viewColumn: emulatorEditor ? vscode.ViewColumn.Beside : vscode.ViewColumn.Active, preserveFocus: true }, {
         enableScripts: true, retainContextWhenHidden: true, localResourceRoots: [vscode.Uri.joinPath(this.context.extensionUri, 'media')],
       });
       const asset = (name: string) => panel.webview.asWebviewUri(vscode.Uri.joinPath(this.context.extensionUri, 'media', name)).toString();
@@ -59,7 +59,7 @@ export class InspectorPanel implements vscode.Disposable {
       this.patch({ targets: this.targets.map(({ id, title, deviceName }) => ({ id, title, deviceName })),
         ...(!this.session ? { status: this.targets.length ? 'Choose an app and connect.' : 'No React Native development app found. Start Metro and open the app in the emulator.' } : {}), error: '' });
     } catch (error) {
-      this.targets = []; this.patch({ targets: [], status: 'Cannot reach Metro. Start your app’s development server, or set Portal: Metro URL.' }); this.problem(error);
+      this.targets = []; this.patch({ targets: [], status: 'Cannot reach Metro. Start your app’s development server, or set Inset: Metro URL.' }); this.problem(error);
     }
   }
   private async connect(target: InspectorTarget): Promise<void> {
@@ -88,7 +88,7 @@ export class InspectorPanel implements vscode.Disposable {
       session.dispose(); this.session = undefined; this.setPicking(false);
       const takenOver = /NEW_DEBUGGER|another debugger/i.test(reason);
       if (takenOver) this.stopped = true;
-      this.patch({ connected: false, connecting: false, tree: [], selection: null, layout: null, status: takenOver ? 'Another debugger took over. Click Connect to reconnect Portal.' : 'App disconnected. Waiting to reconnect…' });
+      this.patch({ connected: false, connecting: false, tree: [], selection: null, layout: null, status: takenOver ? 'Another debugger took over. Click Connect to reconnect Inset.' : 'App disconnected. Waiting to reconnect…' });
       this.scheduleReconnect();
     });
     try { await session.connect(); }
@@ -116,7 +116,7 @@ export class InspectorPanel implements vscode.Disposable {
     if (!message || typeof message !== 'object') return;
     if (message.type === 'ready') { void this.panel?.webview.postMessage({ type: 'update', ...this.model }); return; }
     if (message.type === 'refresh') { await this.refreshTargets(); return; }
-    if (message.type === 'settings') { await vscode.commands.executeCommand('workbench.action.openSettings', 'portal.metroUrl'); return; }
+    if (message.type === 'settings') { await vscode.commands.executeCommand('workbench.action.openSettings', 'inset.metroUrl'); return; }
     if (message.type === 'disconnect') { await this.disconnect(); return; }
     if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before using the inspector.');
     if (message.type === 'connect') {

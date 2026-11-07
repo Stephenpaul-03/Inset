@@ -1,4 +1,12 @@
-# VS Code Android Emulator Panel: v1 handoff
+# Inset: project handoff
+
+## Inset rename — v0.3.0, 7 November 2026
+
+- Current product name: **Inset**. Package/extension: `inset` / `local.inset`. Commands, configuration, views, output channel, inspector messages, asset references and test scripts use the new name. Validation environment variables use `INSET_*`.
+- Current package: `artifacts/inset-0.3.0.vsix`. It has a new extension identity; disable/uninstall the old development extension before enabling it, rename custom settings/keybindings, and select the device/layout again. See README.md for the transition.
+- Historical results below predate this rename. Pre-rename VSIX files retain their original filenames locally; historical validation results are not new v0.3.0 measurements.
+- The repository's current on-disk directory is unchanged. Commands and scripts resolve from the repository root and do not depend on its directory name.
+- Passed: core/browser/channel checks and an unpacked-VSIX smoke test in isolated VS Code (activation, raw rendering, editor reuse and session-preserving view transitions). The renamed package has not replaced the owner's installed development extension. No Git remote is configured yet.
 
 ## Keyboard and drag follow-up — v0.2.1, 6 November 2026
 
@@ -6,18 +14,18 @@
 - Drag moves now use raw pointer updates where available and a timer capped at 120 Hz, independently of webview animation callbacks. Browser regression coverage deliberately delays rAF and verifies that dragging still sends moves.
 - The owner confirmed hardware keyboard input works in the normal VS Code window. Their latest screenshot shows 59 FPS, browser 126 callbacks/s, draw 0.1 ms and frame age 1 ms, but they still report occasional FPS dips. Sustained normal-workspace 60 FPS is **not established**. Earlier direct-source samples included 45 and 55 FPS among near-60 samples; isolated VS Code sidebar/editor runs reached 60 throughout their post-warmup samples. These do not prove the remaining intermittent dips are fixed.
 - Performance details include source/input/browser rates. A follow-up fixes the source label's previous-interval lag by matching reporting windows and adds the longest observed gap between frames in the sample. Pauses/static screens reduce frame and input counts; inspect dips during steady motion. The source counter measures frames received by the extension, not the Android app's internal render rate; frame age excludes emulator rendering/gRPC transit.
-- Validation commands: `npm run test:keyboard` temporarily opens Settings search and restores the previous clipboard/app; `PORTAL_PERFORMANCE_ONLY=1 npm run test:extension` records sidebar/editor scrolling without filtering low post-warmup samples. Avoid interacting with the emulator during those live checks. See VALIDATION.md for results. Local artifact: `artifacts/portal-emulator-0.2.1.vsix`.
+- Validation commands: `npm run test:keyboard` temporarily opens Settings search and restores the previous clipboard/app; `INSET_PERFORMANCE_ONLY=1 npm run test:extension` records sidebar/editor scrolling without filtering low post-warmup samples. Avoid interacting with the emulator during those live checks. See VALIDATION.md for results. Local artifact: the pre-rename v0.2.1 VSIX.
 - The owner clarified that dips occur at swipe starts/ends or pauses, consistent with fewer changed frames in those reporting windows. They have not reported steady-motion dips after this update and approved committing the keyboard/performance changes on 7 November 2026. Do not present the 59-FPS screenshot as proof of sustained 60 FPS; investigate matching source/input/browser/gap readings if actual motion stutters or steady-motion dips are reported.
 
 ## React Native inspection — v0.2.0, 5 November 2026
 
 - Added a React Native inspector **inside VS Code**: reusable editor tab, emulator-toolbar Inspect, native picking/highlighting, searchable component tree/ancestors, props/hooks/state/context, nested hydration, native styles/layout, capability-aware JSON runtime edits, and workspace source navigation through React/Hermes + Metro source maps.
 - Runtime connection: `src/inspector/{CdpClient,discovery,InspectorSession,ComponentTree}.ts`; VS Code host/source boundary: `InspectorPanel.ts`, `source.ts`; production markup/assets: `src/inspector/html.ts`, `media/inspector.{js,css}`. No app files/dependencies were changed for inspection.
-- Commands: **Portal: Open React Native Inspector**, **Portal: Pick React Native Component**. `portal.metroUrl` defaults to `http://127.0.0.1:8081`. The inspector requires workspace trust, local Metro, and a Hermes development build with the Fusebox dispatcher/DevTools bridge v2. Tally (RN 0.81.5, React 19.1, Expo 54) is the verified target; older standalone sockets, release builds, JavaScriptCore and full profiling are outside this adapter. Other RN versions still need validation.
-- RN 0.81 reconnect detail: AppContainer captures the first native overlay agent at mount. Replacing/shutting down that agent breaks native picking after reconnect. Portal reuses an existing dispatcher domain/agent and requests a fresh tree through the bridge's default host-component filter update; on close it stops picking/highlighting and closes CDP, leaving the app's built-in backend intact. Reloads rebuild the tree and discard stale selection requests.
+- Commands: **Inset: Open React Native Inspector**, **Inset: Pick React Native Component**. `inset.metroUrl` defaults to `http://127.0.0.1:8081`. The inspector requires workspace trust, local Metro, and a Hermes development build with the Fusebox dispatcher/DevTools bridge v2. Tally (RN 0.81.5, React 19.1, Expo 54) is the verified target; older standalone sockets, release builds, JavaScriptCore and full profiling are outside this adapter. Other RN versions still need validation.
+- RN 0.81 reconnect detail: AppContainer captures the first native overlay agent at mount. Replacing/shutting down that agent breaks native picking after reconnect. Inset reuses an existing dispatcher domain/agent and requests a fresh tree through the bridge's default host-component filter update; on close it stops picking/highlighting and closes CDP, leaving the app's built-in backend intact. Reloads rebuild the tree and discard stale selection requests.
 - Passed: seven core/protocol/source-boundary tests, production inspector browser checks, existing emulator browser checks, real Tally tree/props/hooks, `App.tsx` source mapping, temporary Text edit/restoration, native picking and reload recovery. The unpacked VSIX passed inside isolated VS Code: real app connection (~892 nodes), one-tab reuse, native selection, close/reopen picking, close cleanup and unchanged emulator session ID.
-- Artifacts: `artifacts/portal-emulator-0.2.0.vsix`, `inspector-live.png`, `inspector-preview.png`, `inspector-packaged-vscode.log`. Build output and screenshots remain ignored.
-- v0.2.0 was installed successfully in the owner's normal VS Code profile. The owner confirmed that the inspector works and approved committing it. Run **Portal: Open React Native Inspector** with the development app and Metro running.
+- Artifacts: the pre-rename v0.2.0 VSIX, `inspector-live.png`, `inspector-preview.png`, `inspector-packaged-vscode.log`. Build output and screenshots remain ignored.
+- v0.2.0 was installed successfully in the owner's normal VS Code profile. The owner confirmed that the inspector works and approved committing it. Run **Inset: Open React Native Inspector** with the development app and Metro running.
 - During validation, the original emulator/Metro processes exited; the same Resizable AVD was restarted headlessly and Tally's local Metro server restarted. No emulator data was erased.
 - Performance follow-up remains open: an inspector-connected drag run averaged 30.73 FPS; a separate baseline started near 60 FPS and then stalled at source FPS zero. A repeat lost the Metro target before measuring. Functional tests and packaged inspection pass, but sustained-60-FPS validation for v0.2.0 is not established. Details/commands are in VALIDATION.md.
 
@@ -25,10 +33,10 @@
 ## Presentation update — v0.1.2, 5 November 2026
 
 - Compact sidebar: one toolbar, connection dot, device name without repeated labels, icon navigation, compact FPS, expandable details and overflow settings.
-- Editor: **Portal: Open Emulator in Editor** (or toolbar pop-out), one reusable tab, Fit/50–200% zoom, scrollbar panning, and **Move to Sidebar**. Closing the editor returns to a visible sidebar.
+- Editor: **Inset: Open Emulator in Editor** (or toolbar pop-out), one reusable tab, Fit/50–200% zoom, scrollbar panning, and **Move to Sidebar**. Closing the editor returns to a visible sidebar.
 - Both surfaces share one transport/session. The parked surface closes its frame socket and accepts only presentation actions; transitions release held touches and invalidate queued input.
 - The browser test now uses the exact production HTML generator in `src/panel/html.ts` and checks zoomed/scrolled coordinates and portrait/landscape fitting. The VS Code suite checks session IDs across moves and benchmarks dragging in both presentations.
-- Local artifact: `artifacts/portal-emulator-0.1.2.vsix`, installed in the normal VS Code profile. Reload the window to activate, then review the layout and editor workflow in the normal workspace. Streaming quality limits and outstanding platform checks are unchanged.
+- Local artifact: the pre-rename v0.1.2 VSIX, installed in the normal VS Code profile. Reload the window to activate, then review the layout and editor workflow in the normal workspace. Streaming quality limits and outstanding platform checks are unchanged.
 - Final complete-run drag means: 59.87 FPS in editor mode and 59.99 FPS in sidebar mode. The unpacked VSIX passed rendering, editor reuse, and session-preserving transitions. The owner reviewed and approved the new layout.
 
 ## Performance update — v0.1.1, 5 November 2026
@@ -37,7 +45,7 @@ The installed v0.1.0 reproduced low FPS at 738×1640. Direct profiling showed a 
 
 ### Historical v0.1.1 checkpoint
 
-- v0.1.1 is packaged at `artifacts/portal-emulator-0.1.1.vsix` and installed in the owner's normal VS Code profile. Activation required **Developer: Reload Window**; performance in that workspace has not yet been confirmed.
+- v0.1.1 is packaged at the pre-rename v0.1.1 VSIX and installed in the owner's normal VS Code profile. Activation required **Developer: Reload Window**; performance in that workspace has not yet been confirmed.
 - Next: verify that the HUD shows `rgba · local` after activation and measure actual dragging in the normal workspace. Check image sharpness against the 0.6-megapixel cap before adjusting quality settings.
 - Passed before this checkpoint: core tests, local-channel capability/Origin checks, browser rendering/input checks, live rotation/resizing, full-cap webview-originated dragging (60.002 FPS mean), reconnect/auth recovery, and unpacked VSIX raw-channel smoke validation.
 
@@ -48,12 +56,12 @@ The extension is implemented in `src/` and `media/`. See `README.md` for install
 - Built: sidebar canvas, adaptive PNG/ArrayBuffer streaming, bounded frame delivery, performance HUD, device picker, pointer/wheel input, navigation/rotate/refresh, path settings, reconnect, and hidden-view pause/resume.
 - Verified on the owner's Mac: real VS Code rendering at approximately 59–60 FPS during steady scrolling, rotation, Resizable AVD phone/foldable/tablet modes, transport reconnect, and hide/resume. Simulated restart tests cover changed ports/tokens and authentication recovery.
 - Remaining: actual process restart and sleep/wake, second real emulator/device switching, Linux/Windows, and extended daily use. Multi-touch RPCs are accepted; pinch behavior remains unverified.
-- Local VSIX: `artifacts/portal-emulator-0.1.1.vsix`. This is a private development build, not a Marketplace release. Working name: Portal Emulator.
+- Local VSIX: the pre-rename v0.1.1 VSIX. This is a private development build, not a Marketplace release. Working name: Inset.
 - Repository cleanup: original spike scripts, the minimal protocol, raw benchmark JSON, and captured emulator screenshots have been removed. Their findings remain below; current validation scripts are in `scripts/` and use a neutral test fixture. Build output and local artifacts are ignored by Git.
 
 ---
 
-Working title: TBD (candidates: Porthole, Pane, SideDroid). Check Marketplace/npm for conflicts before publishing.
+Product name: Inset. Marketplace/npm availability still needs checking before publishing.
 
 ## Goal
 A VS Code extension that shows and controls an **already-running** Android emulator (started from Android Studio, resizable AVD included) inside the sidebar. No second emulator, no extra window. Expo / React Native workflow is the main use case. Emulators only for now; physical phones are out of scope.

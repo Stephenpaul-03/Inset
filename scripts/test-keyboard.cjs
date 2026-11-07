@@ -28,12 +28,12 @@ const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
     await adb.run(['-s', target.serial, 'shell', 'am', 'start', '-a', 'android.settings.APP_SEARCH_SETTINGS']);
     await sleep(800);
     await chord('a'); await press('Backspace');
-    await transport.text('Portal keyboard 123!'); await sleep(250);
-    assert.ok(await query() === 'Portal keyboard 123!', 'Typing, select-all and copy must reach the Android query');
-    await transport.paste('Portal paste 🙂'); await sleep(300);
-    assert.ok(await query() === 'Portal paste 🙂', 'Unicode paste must replace the selected query');
+    await transport.text('Inset keyboard 123!'); await sleep(250);
+    assert.ok(await query() === 'Inset keyboard 123!', 'Typing, select-all and copy must reach the Android query');
+    await transport.paste('Inset paste 🙂'); await sleep(300);
+    assert.ok(await query() === 'Inset paste 🙂', 'Unicode paste must replace the selected query');
     await press('ArrowRight'); await press('Backspace'); await transport.text('!'); await sleep(200);
-    assert.ok(await query() === 'Portal paste !', 'Arrow navigation and Backspace must edit the query');
+    assert.ok(await query() === 'Inset paste !', 'Arrow navigation and Backspace must edit the query');
     console.log('Live keyboard passed: real Android typing, modifiers/select-all/copy, Unicode paste, arrow navigation and Backspace.');
   } finally {
     await chord('a').then(() => press('Backspace')).catch(() => {});

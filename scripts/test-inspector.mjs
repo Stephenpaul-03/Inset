@@ -10,7 +10,7 @@ import { Adb } from '../out/src/adb/adb.js';
 
 const root = path.resolve(import.meta.dirname, '..');
 const live = process.argv.includes('--live');
-const metro = process.env.PORTAL_METRO_URL || 'http://127.0.0.1:8081';
+const metro = process.env.INSET_METRO_URL || 'http://127.0.0.1:8081';
 const messages = [], errors = [], problems = [];
 let session, page, restore, phase = 'startup', closing = false;
 const model = { targets: [{ id: 'fixture', title: 'Inspector fixture' }], tree: [], selection: null, connected: false, capabilities: {} };
@@ -52,8 +52,8 @@ const browser = await chromium.launch({ executablePath: '/Applications/Google Ch
 try {
   page = await browser.newPage({ viewport: { width: 1120, height: 760 } });
   page.on('pageerror', error => errors.push(error.message));
-  await page.exposeFunction('portalMessage', receive);
-  await page.addInitScript(() => { window.acquireVsCodeApi = () => ({ postMessage: message => { void window.portalMessage(message); } }); });
+  await page.exposeFunction('insetMessage', receive);
+  await page.addInitScript(() => { window.acquireVsCodeApi = () => ({ postMessage: message => { void window.insetMessage(message); } }); });
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   if (live) {
     let target;
@@ -99,11 +99,11 @@ try {
     await page.waitForFunction(id => document.querySelector(`[data-id="${id}"]`)?.getAttribute('aria-selected') === 'true' && !document.querySelector('#details').hidden, textNode.id);
     const row = page.locator('#props > .property').filter({ has: page.locator('.property-label', { hasText: /^children:$/ }) }).first();
     await row.getByRole('button', { name: 'Edit', exact: true }).click();
-    await row.locator('textarea').fill(JSON.stringify(`${original} [Portal check]`));
+    await row.locator('textarea').fill(JSON.stringify(`${original} [Inset check]`));
     await row.getByRole('button', { name: 'Apply', exact: true }).click();
-    await page.waitForFunction(() => document.querySelector('#props').textContent.includes('[Portal check]'));
+    await page.waitForFunction(() => document.querySelector('#props').textContent.includes('[Inset check]'));
     await restore(); restore = undefined;
-    await page.waitForFunction(() => !document.querySelector('#props').textContent.includes('[Portal check]'));
+    await page.waitForFunction(() => !document.querySelector('#props').textContent.includes('[Inset check]'));
     phase = 'native picking'; await page.locator('#pick').click();
     await page.waitForFunction(() => document.querySelector('#pick').getAttribute('aria-pressed') === 'true');
     // Bridge acknowledgment precedes React's native overlay commit.

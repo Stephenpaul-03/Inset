@@ -1,8 +1,8 @@
 {
-  "name": "portal-emulator",
-  "version": "0.2.1",
+  "name": "inset",
+  "version": "0.3.0",
   "private": true,
-  "description": "View and control a running Android emulator in a compact sidebar or editor tab.",
+  "description": "View and control an Android emulator and inspect React Native components inside VS Code.",
   "main": "./dist/extension.js",
   "scripts": {
     "build": "npm run typecheck && node scripts/build.mjs",
@@ -32,7 +32,7 @@
     "playwright": "^1.64.1",
     "typescript": "^7.0.2"
   },
-  "displayName": "Portal Emulator",
+  "displayName": "Inset",
   "publisher": "local",
   "license": "UNLICENSED",
   "engines": {
@@ -45,93 +45,93 @@
     "ui"
   ],
   "activationEvents": [
-    "onView:portal.emulator"
+    "onView:inset.emulator"
   ],
   "contributes": {
     "commands": [
       {
-        "command": "portal.open",
-        "title": "Portal: Open Emulator"
+        "command": "inset.open",
+        "title": "Inset: Open Emulator"
       },
       {
-        "command": "portal.refresh",
-        "title": "Portal: Refresh Connection"
+        "command": "inset.refresh",
+        "title": "Inset: Refresh Connection"
       },
       {
-        "command": "portal.diagnostics",
-        "title": "Portal: Show Diagnostics"
+        "command": "inset.diagnostics",
+        "title": "Inset: Show Diagnostics"
       },
       {
-        "command": "portal.benchmark",
-        "title": "Portal: Measure Scrolling Performance"
+        "command": "inset.benchmark",
+        "title": "Inset: Measure Scrolling Performance"
       },
       {
-        "command": "portal.openEditor",
-        "title": "Portal: Open Emulator in Editor"
+        "command": "inset.openEditor",
+        "title": "Inset: Open Emulator in Editor"
       },
       {
-        "command": "portal.openSidebar",
-        "title": "Portal: Move Emulator to Sidebar"
+        "command": "inset.openSidebar",
+        "title": "Inset: Move Emulator to Sidebar"
       },
       {
-        "command": "portal.inspect",
-        "title": "Portal: Open React Native Inspector"
+        "command": "inset.inspect",
+        "title": "Inset: Open React Native Inspector"
       },
       {
-        "command": "portal.pickComponent",
-        "title": "Portal: Pick React Native Component"
+        "command": "inset.pickComponent",
+        "title": "Inset: Pick React Native Component"
       }
     ],
     "viewsContainers": {
       "activitybar": [
         {
-          "id": "portal",
-          "title": "Portal",
-          "icon": "media/portal.svg"
+          "id": "inset",
+          "title": "Inset",
+          "icon": "media/inset.svg"
         }
       ]
     },
     "views": {
-      "portal": [
+      "inset": [
         {
           "type": "webview",
-          "id": "portal.emulator",
+          "id": "inset.emulator",
           "name": "Emulator"
         }
       ]
     },
     "configuration": {
-      "title": "Portal",
+      "title": "Inset",
       "properties": {
-        "portal.adbPath": {
+        "inset.adbPath": {
           "type": "string",
           "default": "",
           "scope": "machine",
           "description": "Absolute path to adb. Takes precedence over SDK Path."
         },
-        "portal.sdkPath": {
+        "inset.sdkPath": {
           "type": "string",
           "default": "",
           "scope": "machine",
           "description": "Android SDK directory containing platform-tools."
         },
-        "portal.discoveryPath": {
+        "inset.discoveryPath": {
           "type": "string",
           "default": "",
           "scope": "machine",
           "description": "Override the directory containing emulator pid_*.ini discovery files."
         },
-        "portal.lowBandwidth": {
+        "inset.lowBandwidth": {
           "type": "boolean",
           "default": false,
           "description": "Use PNG and cap resolution at one third of native size; encoding can reduce FPS."
         },
-        "portal.showPerformance": {
+        "inset.showPerformance": {
           "type": "boolean",
           "default": false,
           "description": "Expand performance details by default. The compact FPS indicator remains visible."
         },
-        "portal.streamMode": {
+        "inset.streamMode": {
           "type": "string",
           "enum": [
             "smooth",
@@ -144,7 +144,7 @@
           "default": "smooth",
           "description": "Emulator streaming mode."
         },
-        "portal.metroUrl": {
+        "inset.metroUrl": {
           "type": "string",
           "default": "http://127.0.0.1:8081",
           "description": "Local Metro development-server URL used by the React Native inspector."

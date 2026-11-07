@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Rename the extension to Inset, including commands, settings, output, inspector UI, icon asset, development scripts and documentation.
+- Use the extension ID `local.inset`, `inset.*` commands/settings and `INSET_*` validation environment variables. Package as `inset-0.3.0.vsix`.
+- This is a separate VS Code extension identity. Disable the previous development extension and rename custom settings/keybindings before switching; see README.md.
+
 ## 0.2.1
 
 - Add hardware keyboard forwarding when the emulator screen is focused, including editing/navigation keys, modifier chords, composition, and plain-text paste.

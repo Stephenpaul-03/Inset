@@ -5,4 +5,4 @@ const root = path.resolve(import.meta.dirname, '..');
 const manifest = JSON.parse(await fs.readFile(path.join(root, 'package.json'), 'utf8'));
 await fs.mkdir(path.join(root, 'artifacts'), { recursive: true });
 execFileSync(process.execPath, [path.join(root, 'node_modules/@vscode/vsce/vsce'), 'package', '--no-dependencies', '--allow-missing-repository',
-  '--out', `artifacts/portal-emulator-${manifest.version}.vsix`], { cwd: root, stdio: 'inherit' });
+  '--out', `artifacts/${manifest.name}-${manifest.version}.vsix`], { cwd: root, stdio: 'inherit' });

@@ -9,7 +9,7 @@ import { LatestFrameQueue } from '../src/panel/LatestFrameQueue';
 
 test('discovery tolerates incomplete files and preserves tokens containing equals', async () => {
   assert.equal(parseIni('#comment=x\ngrpc.token=a=b=c\r\n[section]\n avd.name = Tablet')['grpc.token'], 'a=b=c');
-  const dir = await mkdtemp(path.join(os.tmpdir(), 'portal-discovery-'));
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'inset-discovery-'));
   try {
     await writeFile(path.join(dir, 'pid_1.ini'), 'port.serial=5554\navd.name=Resizable\ngrpc.port=8554\ngrpc.token=a=b');
     await writeFile(path.join(dir, 'pid_2.ini'), 'port.serial=wrong\ngrpc.port=99999');

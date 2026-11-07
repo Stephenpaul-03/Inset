@@ -3,14 +3,14 @@ export function inspectorHtml(options: { cspSource: string; styleUri: string; sc
   const nonce = randomBytes(18).toString('base64');
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${options.cspSource}; script-src 'nonce-${nonce}';">
-  <link rel="stylesheet" href="${options.styleUri}"><title>Portal React Native Inspector</title></head><body>
+  <link rel="stylesheet" href="${options.styleUri}"><title>Inset React Native Inspector</title></head><body>
   <header><span class="brand">React Native</span><select id="targets" aria-label="React Native app"><option value="">Choose an app…</option></select>
     <button id="connect">Connect</button><button id="refresh" title="Refresh running apps">Refresh</button>
     <button id="reload-app" disabled>Reload app</button><button id="disconnect" disabled>Disconnect</button><button id="settings" title="Configure Metro address">Settings</button></header>
   <div class="status-line"><span id="connection" class="dot"></span><span id="status" role="status">Start Metro and open a development build to inspect components.</span><span id="version"></span></div>
   <div id="error" role="alert" hidden></div>
   <main><section class="tree-pane" aria-label="Component hierarchy"><div class="tree-toolbar"><input id="search" type="search" placeholder="Find components…" aria-label="Find components">
-    <button id="pick" aria-pressed="false" disabled title="Select a component by clicking it in Portal’s emulator">Pick</button></div>
+    <button id="pick" aria-pressed="false" disabled title="Select a component by clicking it in Inset’s emulator">Pick</button></div>
     <div id="tree" role="tree" aria-label="React component tree" tabindex="0"></div><div id="empty-tree">Connect to your app to see its React components.</div>
     <footer><span id="count">0 components</span><button id="collapse">Collapse all</button></footer></section>
   <section class="details-pane" aria-label="Selected component"><div class="selection-header"><div><span class="eyebrow">SELECTED COMPONENT</span><h1 id="name">Select a component</h1></div>

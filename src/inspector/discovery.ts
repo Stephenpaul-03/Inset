@@ -2,7 +2,7 @@ export interface InspectorTarget { id: string; title: string; description?: stri
 export function metroAddress(value: string): URL {
   const url = new URL(value);
   if (url.protocol !== 'http:' || !['localhost', '127.0.0.1', '[::1]'].includes(url.hostname) || url.username || url.password) {
-    throw new Error('Set Portal: Metro URL to a local HTTP address, for example http://127.0.0.1:8081.');
+    throw new Error('Set Inset: Metro URL to a local HTTP address, for example http://127.0.0.1:8081.');
   }
   return new URL(url.origin);
 }

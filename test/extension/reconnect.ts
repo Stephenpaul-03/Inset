@@ -9,7 +9,7 @@ import assert from 'node:assert/strict';
 // Exercise the provider's automatic rediscovery without restarting the owner's
 // real emulator. The fake endpoint speaks the same protocol over loopback.
 export async function verifyReconnect(extensionPath: string, waitFor: (predicate: (d: any) => boolean) => Promise<any>): Promise<string[]> {
-  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'portal-restart-'));
+  const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'inset-restart-'));
   const definition = grpc.loadPackageDefinition(protoLoader.loadSync(path.join(extensionPath, 'proto/emulator_controller.proto'), { enums: String, longs: String, defaults: true })) as any;
   const image = await fs.readFile(path.join(extensionPath, 'test/fixtures/screen.png'));
   const rawImage = Buffer.alloc(540 * 1200 * 4, 255);
@@ -38,7 +38,7 @@ export async function verifyReconnect(extensionPath: string, waitFor: (predicate
   async function advertise(port: number, token: string, name: string) {
     await fs.writeFile(path.join(dir, 'pid_123.ini'), `port.serial=5554\navd.name=${name}\ngrpc.port=${port}\ngrpc.token=${token}\n`);
   }
-  const config = vscode.workspace.getConfiguration('portal');
+  const config = vscode.workspace.getConfiguration('inset');
   const previous = config.inspect<string>('discoveryPath')?.globalValue;
   try {
     const first = await server('first');

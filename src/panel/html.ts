@@ -21,7 +21,7 @@ export function webviewHtml(options: HtmlOptions): string {
   const editor = options.mode === 'editor';
   return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src blob:; connect-src ${options.connectOrigin || "'none'"}; style-src ${options.cspSource}; script-src 'nonce-${nonce}';">
-    <link rel="stylesheet" href="${options.styleUri}"><title>Portal Emulator</title></head>
+    <link rel="stylesheet" href="${options.styleUri}"><title>Inset</title></head>
     <body data-mode="${options.mode}"><header class="toolbar" aria-label="Emulator toolbar">
       <span id="connection" class="connection" role="img" aria-label="Disconnected" title="Disconnected"></span>
       <select id="devices" aria-label="Running emulator"><option>No running emulators</option></select>

@@ -65,17 +65,17 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
 
   private inspectorPicking = false;
   constructor(private readonly context: vscode.ExtensionContext, private readonly openInspector?: () => Promise<void>) {
-    this.selected = context.workspaceState.get('portal.selectedDevice');
+    this.selected = context.workspaceState.get('inset.selectedDevice');
     this.poll = setInterval(() => { if (this.active) void this.scan(); }, 2000);
     this.listeners.push(vscode.workspace.onDidChangeConfiguration(event => {
-      if (['adbPath', 'sdkPath', 'discoveryPath', 'lowBandwidth', 'showPerformance', 'streamMode'].some(key => event.affectsConfiguration(`portal.${key}`))) {
+      if (['adbPath', 'sdkPath', 'discoveryPath', 'lowBandwidth', 'showPerformance', 'streamMode'].some(key => event.affectsConfiguration(`inset.${key}`))) {
         this.disconnect(); this.adb.stop();
         if (this.active) { this.adb.track(() => { void this.scan(); }); void this.scan(); }
         this.sendConfig();
       }
     }));
   }
-  private get config() { return vscode.workspace.getConfiguration('portal'); }
+  private get config() { return vscode.workspace.getConfiguration('inset'); }
   private get view() { return this.current?.host; }
   private get channel() { return this.current?.channel; }
   private get ready() { return this.current?.ready; }
@@ -90,16 +90,16 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
     if (this.editor) {
       (this.editor.host as vscode.WebviewPanel).reveal(undefined, false);
     } else {
-      const panel = vscode.window.createWebviewPanel('portal.editor', 'Emulator',
+      const panel = vscode.window.createWebviewPanel('inset.editor', 'Emulator',
         { viewColumn: vscode.ViewColumn.Beside, preserveFocus: false }, { enableScripts: true, retainContextWhenHidden: true });
-      panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media/portal.svg');
+      panel.iconPath = vscode.Uri.joinPath(this.context.extensionUri, 'media/inset.svg');
       this.editor = this.createSurface(panel, 'editor');
     }
     this.reconcile();
   }
   async openSidebar(): Promise<void> {
     this.preferred = 'sidebar';
-    await vscode.commands.executeCommand('portal.emulator.focus');
+    await vscode.commands.executeCommand('inset.emulator.focus');
     (this.editor?.host as vscode.WebviewPanel | undefined)?.dispose();
     this.reconcile();
   }
@@ -313,7 +313,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
       this.updateViewport();
     } else if (message.type === 'selectDevice' && this.targets.some(t => t.serial === message.serial)) {
       this.selected = message.serial;
-      await this.context.workspaceState.update('portal.selectedDevice', this.selected);
+      await this.context.workspaceState.update('inset.selectedDevice', this.selected);
       this.disconnect(); await this.scan();
     } else if (message.type === 'pointer' && ['down', 'move', 'up'].includes(message.action)) {
       if (!Number.isFinite(message.x) || !Number.isFinite(message.y) || !Number.isInteger(message.id) || message.id < 0 || message.id > 9) return;
@@ -348,7 +348,7 @@ export class EmulatorView implements vscode.WebviewViewProvider, vscode.Disposab
       if (message.name === 'openEditor') { await this.openEditor(); return; }
       if (message.name === 'openSidebar') { await this.openSidebar(); return; }
       if (message.name === 'refresh') { await this.refresh(); return; }
-      if (message.name === 'settings') { await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:local.portal-emulator'); return; }
+      if (message.name === 'settings') { await vscode.commands.executeCommand('workbench.action.openSettings', '@ext:local.inset'); return; }
       if (!this.selected || !this.transport) return;
       if (message.name === 'rotate') await this.transport.rotate();
       else if (message.name === 'back' || message.name === 'home' || message.name === 'recents') await this.adb.key(this.selected, message.name);

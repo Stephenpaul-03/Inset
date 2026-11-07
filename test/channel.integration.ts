@@ -6,7 +6,7 @@ import { FrameChannel } from '../src/panel/FrameChannel';
 test('local channel validates capabilities and origins, and transfers binary frames and input', async () => {
   const messages: unknown[] = [];
   const channel = new FrameChannel(message => messages.push(message), () => {});
-  const origin = 'vscode-webview://portal-test';
+  const origin = 'vscode-webview://inset-test';
   await channel.start(origin);
   const clients: WebSocket[] = [];
   const connect = (url: string, clientOrigin: string) => new Promise<WebSocket>((resolve, reject) => {

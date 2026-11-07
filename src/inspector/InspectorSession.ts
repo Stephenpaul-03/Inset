@@ -77,7 +77,7 @@ export class InspectorSession extends EventEmitter {
       // RN reconnects its backend automatically when the CDP binding survives a
       // reload. Replacing that agent would strand AppContainer's native picker
       // on its old agent in RN 0.81. Reuse it and request a clean tree snapshot
-      // through the supported filter-update operation (the Portal default).
+      // through the supported filter-update operation (the Inset default).
       if (reused) {
         this.tree.clear();
         await this.send('updateComponentFilters', [{ type: 1, value: 7, isEnabled: true }]);
@@ -104,7 +104,7 @@ export class InspectorSession extends EventEmitter {
       }, 500);
     } else if (event === 'bridgeProtocol') {
       this.bridgeProtocol = payload?.version;
-      if (this.bridgeProtocol !== 2) this.emit('problem', new Error(`Unsupported React DevTools bridge version ${this.bridgeProtocol}. Portal currently supports bridge version 2.`));
+      if (this.bridgeProtocol !== 2) this.emit('problem', new Error(`Unsupported React DevTools bridge version ${this.bridgeProtocol}. Inset currently supports bridge version 2.`));
     } else if (event === 'backendVersion') this.emit('version', payload);
     else if (event === 'selectElement' && Number.isSafeInteger(payload)) {
       void this.select(payload, false).catch(error => this.emit('problem', error));
@@ -216,7 +216,7 @@ export class InspectorSession extends EventEmitter {
       await this.send('clearHostInstanceHighlight').catch(() => {});
       // Leave the app's built-in agent available to AppContainer. Sending
       // shutdown breaks RN 0.81's picker after reconnect because its overlay
-      // captures that agent at mount. Only the CDP connection belongs to Portal.
+      // captures that agent at mount. Only the CDP connection belongs to Inset.
     }
     this.dispose();
   }

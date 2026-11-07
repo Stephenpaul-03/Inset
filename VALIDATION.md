@@ -1,6 +1,13 @@
-# Validation — updated 6 November 2026
+# Validation — updated 7 November 2026
 
 Environment: macOS arm64, Android Emulator 36.5.11, Resizable AVD, VS Code 1.144.1.
+
+## Inset rename — v0.3.0
+
+- Renamed the manifest, commands, configuration namespace, view IDs, inspector UI/output, icon path, package name, test fixtures and validation environment variables. The only old product-name references in current source/docs are the README's explicit transition instructions.
+- Passed: nine core tests, TypeScript checking/bundling, production emulator and inspector browser fixtures, and the local binary channel integration check. The binary frame marker is unchanged; the branding update does not change the frame protocol.
+- The unpacked `inset-0.3.0.vsix` passed in an isolated VS Code profile without project dependencies: activation as `local.inset`, raw emulator rendering, one reusable editor tab, and sidebar/editor moves retaining the same emulator session. The user's installed development extension was not replaced by this check.
+- Previous-version measurements below remain historical. This rename is not a fresh sustained-FPS measurement or a new React Native runtime compatibility claim.
 
 ## Keyboard and drag follow-up — v0.2.1
 
@@ -27,8 +34,8 @@ Environment: macOS arm64, Android Emulator 36.5.11, Resizable AVD, VS Code 1.144
 - Production inspector HTML/CSP passed browser checks for tree/filtering, app values rendered as text, JSON validation, edit messages, nested hydration, source action, and narrow layout. Existing emulator browser rendering/input/zoom checks also passed after the toolbar addition.
 - Live Tally: React Native 0.81.5, React 19.1, Expo 54, Hermes, DevTools backend `6.1.5-5d87cd2244` / bridge v2. Passed real component selection/props/hooks, source mapping to `Tally/App.tsx`, temporary Text-prop change and restoration, native overlay picking, and app reload recovery. The final reload rebuilt an 862-node tree; normal steady-state snapshots were around 892 nodes. No application source files or persistent data were modified.
 - Isolated VS Code passed real connection, one editor-tab reuse, native selection, unchanged emulator session ID, close cleanup, and native picking after close/reopen. The same checks passed against the unpacked VSIX outside project dependencies. Log: `artifacts/inspector-packaged-vscode.log`.
-- RN 0.81 compatibility finding: replacing the runtime's DevTools agent leaves AppContainer's native picker using its captured old agent. Portal reuses the existing domain/agent on reconnect and uses a bridge filter update to rebuild the tree. Closing stops native selection/highlights and closes CDP while preserving the built-in runtime agent.
-- **The inspector-connected sustained-60-FPS check did not pass.** One Settings drag run averaged 30.73 FPS. A separate emulator-only baseline produced four approximately 60-FPS samples, then stalled at source FPS zero; a subsequent inspector check lost its runtime target before benchmarking. The original AVD/Metro processes exited during this work; functional checks completed after restarting the same AVD headlessly. These results do not isolate inspector overhead and do not establish sustained 60 FPS for v0.2.0. Repeat in the normal foreground VS Code/emulator setup; do not filter out stalled/low samples. `PORTAL_INSPECTOR_PERFORMANCE=1 PORTAL_INSPECTOR_SMOKE=1 npm run test:extension` retains the optional >=55-FPS regression check.
+- RN 0.81 compatibility finding: replacing the runtime's DevTools agent leaves AppContainer's native picker using its captured old agent. Inset reuses the existing domain/agent on reconnect and uses a bridge filter update to rebuild the tree. Closing stops native selection/highlights and closes CDP while preserving the built-in runtime agent.
+- **The inspector-connected sustained-60-FPS check did not pass.** One Settings drag run averaged 30.73 FPS. A separate emulator-only baseline produced four approximately 60-FPS samples, then stalled at source FPS zero; a subsequent inspector check lost its runtime target before benchmarking. The original AVD/Metro processes exited during this work; functional checks completed after restarting the same AVD headlessly. These results do not isolate inspector overhead and do not establish sustained 60 FPS for v0.2.0. Repeat in the normal foreground VS Code/emulator setup; do not filter out stalled/low samples. `INSET_INSPECTOR_PERFORMANCE=1 INSET_INSPECTOR_SMOKE=1 npm run test:extension` retains the optional >=55-FPS regression check.
 - Other React Native/Expo versions, older standalone sockets, JavaScriptCore, release builds, remote Metro, and full profiling are not validated/supported by the initial adapter. Runtime disconnects rediscover only the previously selected app/device; multi-app and prolonged restart coverage still need broader testing.
 
 ## Compact sidebar and editor — v0.1.2

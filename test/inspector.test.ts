@@ -33,7 +33,7 @@ test('inspector discovery accepts only explicit local HTTP Metro addresses', () 
 });
 
 test('source navigation stays inside real workspace roots including through symlinks', async () => {
-  const dir = await mkdtemp(path.join(os.tmpdir(), 'portal-source-'));
+  const dir = await mkdtemp(path.join(os.tmpdir(), 'inset-source-'));
   try {
     const root = path.join(dir, 'project'); await mkdir(root);
     const file = path.join(root, 'Account.tsx'); await writeFile(file, 'export const Account = 1;');
