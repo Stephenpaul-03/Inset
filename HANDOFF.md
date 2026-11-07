@@ -1,5 +1,12 @@
 # Inset: project handoff
 
+## GitHub preparation — 7 November 2026
+
+- Prepared a development repository, with distribution deferred until v1. The root README is the project overview; detailed controls/settings are in `docs/USAGE.md`. Added CONTRIBUTING.md, ROADMAP.md, SECURITY.md, repository setup notes, issue/PR templates, weekly Dependabot configuration, Node 24 guidance and a source/browser CI workflow. The original license restriction is unchanged.
+- `npm run check` builds/typechecks and runs core, local-channel and both production browser fixture suites without a device. CI uses pinned official actions, read-only contents permissions, a lockfile install and Playwright Chromium on Linux. Browser launch supports `INSET_BROWSER_PATH`, installed macOS Chrome and Playwright's default browser.
+- No packaging, release upload or Marketplace workflow is present. The destination GitHub repository is being created by the owner. Add the confirmed remote and repository metadata after its URL is provided; no owner/URL is invented here.
+- A fresh temporary source copy passed `npm ci --offline` and `npm run check`. Both browser suites additionally passed with Playwright's downloaded Chromium headless shell. The lockfile and regenerated notices remained unchanged, YAML parsed, and relative Markdown links resolved. This is local validation; the hosted workflow must still pass after the first push.
+
 ## Inset rename — v0.3.0, 7 November 2026
 
 - Current product name: **Inset**. Package/extension: `inset` / `local.inset`. Commands, configuration, views, output channel, inspector messages, asset references and test scripts use the new name. Validation environment variables use `INSET_*`.

@@ -2,6 +2,12 @@
 
 Environment: macOS arm64, Android Emulator 36.5.11, Resizable AVD, VS Code 1.144.1.
 
+## GitHub preparation — 7 November 2026
+
+- A clean temporary source copy installed the exact lockfile with `npm ci --offline` and passed `npm run check`: build/typecheck, nine core tests, one local-channel integration test and both production browser fixture suites. Regenerated third-party notices and the lockfile matched the repository files.
+- Both browser suites also passed using Playwright's downloaded Chromium headless shell via `INSET_BROWSER_PATH`, in addition to installed macOS Chrome. The browser helper falls back to Playwright's default on runners without installed macOS Chrome.
+- Workflow/Dependabot YAML parsed, relative guide links resolved and `git diff --check` passed. The hosted Linux CI workflow has not run yet; confirm its first run after the repository is created and pushed. This work did not rerun live emulator/RN tests or add any package/release publishing workflow.
+
 ## Inset rename — v0.3.0
 
 - Renamed the manifest, commands, configuration namespace, view IDs, inspector UI/output, icon path, package name, test fixtures and validation environment variables. The only old product-name references in current source/docs are the README's explicit transition instructions.

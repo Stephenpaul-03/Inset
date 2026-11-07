@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+- Prepare the GitHub repository with source/browser CI, dependency update configuration, issue/PR templates and maintainer setup notes.
+- Add contribution, security and v1 roadmap guides; separate the repository overview from detailed usage documentation.
+- Make browser fixtures use Playwright Chromium on CI, with local Chrome and executable-path overrides supported. No release or publishing automation is added.
+
 ## 0.3.0
 
 - Rename the extension to Inset, including commands, settings, output, inspector UI, icon asset, development scripts and documentation.

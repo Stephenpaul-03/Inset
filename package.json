@@ -5,6 +5,7 @@
   "description": "View and control an Android emulator and inspect React Native components inside VS Code.",
   "main": "./dist/extension.js",
   "scripts": {
+    "check": "npm run build && npm test && npm run test:channel && npm run test:webview && npm run test:inspector",
     "build": "npm run typecheck && node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
     "test": "tsc && node --test out/test/*.test.js",

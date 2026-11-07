@@ -3,6 +3,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { browserLaunchOptions } from './browser.mjs';
 import { inspectorHtml } from '../out/src/inspector/html.js';
 import { InspectorSession } from '../out/src/inspector/InspectorSession.js';
 import { discoverTargets } from '../out/src/inspector/discovery.js';
@@ -48,7 +49,7 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Content-Type', file); res.end(await fs.readFile(path.join(root, 'media', req.url.slice(1))));
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const browser = await chromium.launch(browserLaunchOptions());
 try {
   page = await browser.newPage({ viewport: { width: 1120, height: 760 } });
   page.on('pageerror', error => errors.push(error.message));

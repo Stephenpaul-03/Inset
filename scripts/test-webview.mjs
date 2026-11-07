@@ -3,6 +3,7 @@ import http from 'node:http';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import assert from 'node:assert/strict';
+import { browserLaunchOptions } from './browser.mjs';
 import { FrameChannel } from '../out/src/panel/FrameChannel.js';
 import { webviewHtml } from '../out/src/panel/html.js';
 const root = path.resolve(import.meta.dirname, '..');
@@ -18,7 +19,7 @@ await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const channelMessages = [];
 const channel = new FrameChannel(message => channelMessages.push(message), () => {});
 await channel.start(`http://127.0.0.1:${server.address().port}`);
-const browser = await chromium.launch({ executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', headless: true });
+const browser = await chromium.launch(browserLaunchOptions());
 try {
   const page = await browser.newPage({ viewport: { width: 380, height: 900 }, deviceScaleFactor: 2 });
   const errors = []; page.on('pageerror', e => errors.push(e.message));
